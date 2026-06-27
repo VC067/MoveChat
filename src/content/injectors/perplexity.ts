@@ -54,6 +54,7 @@ export const injectPerplexity = async (pending: PendingHandoff) => {
       dataTransfer.items.add(mainFile);
       if (pending.attachments) {
         for (const att of pending.attachments) {
+          if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
           } catch (_) {}

@@ -57,6 +57,7 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
       dataTransfer.items.add(mainFile);
       if (pending.attachments) {
         for (const att of pending.attachments) {
+          if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
           } catch (_) {

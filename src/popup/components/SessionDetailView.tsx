@@ -208,6 +208,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       for (const msg of session.messages) {
         if (msg.files && msg.files.length > 0) {
           for (const file of msg.files) {
+            if (file.name === 'debug_log.txt') continue;
             if (file.content && !allAttachments.some(a => a.content === file.content)) {
               allAttachments.push({
                 name: file.name,
