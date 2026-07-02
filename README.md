@@ -126,7 +126,8 @@ MoveChat requests the following permissions:
 | `storage` | Store conversations, settings, and API keys locally |
 | `tabs` | Open new tabs when resuming on another platform |
 | `scripting` | Dynamically inject content scripts |
-| `*://*/*` | Fetch images from third-party CDNs embedded in conversations |
+
+Host permissions are scoped to specific domains (`chatgpt.com`, `claude.ai`, `gemini.google.com`, `perplexity.ai`, plus image CDNs like `*.oaiusercontent.com`, `*.googleusercontent.com`, etc.) — see `manifest.json` for the full list.
 
 See [docs/privacy.html](https://vc067.github.io/MoveChat/privacy) for our full privacy policy.
 

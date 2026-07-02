@@ -533,7 +533,22 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
     // Embed any image attachments
     if (msg.files) {
       msg.files.forEach(file => {
-        if (file.type.startsWith('image/') && file.content && file.content.startsWith('data:image/')) {
+        if (file.type === 'image/url' && file.content) {
+          // Image conversion failed — show a placeholder with the URL
+          y = checkPageOverflow(doc, y, 15, pageHeight, margin);
+          doc.setFont('Helvetica', 'italic');
+          doc.setFontSize(8.5);
+          doc.setTextColor(148, 163, 184); // Slate-400
+          doc.text(`[Image: ${file.name}]`, margin + 4, y);
+          y += 4;
+          doc.setTextColor(100, 116, 139); // Slate-500
+          const urlText = doc.splitTextToSize(`Source: ${file.content}`, contentWidth - 8);
+          urlText.forEach((line: string) => {
+            doc.text(line, margin + 4, y);
+            y += 4;
+          });
+          y += 4;
+        } else if (file.type.startsWith('image/') && file.content && file.content.startsWith('data:image/')) {
           try {
             const formatMatch = file.content.match(/^data:image\/(\w+);base64,/);
             const format = formatMatch ? formatMatch[1].toUpperCase() : 'JPEG';

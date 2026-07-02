@@ -4,7 +4,7 @@ import { elementToMarkdown } from '../dom';
 // Wait for an image element to complete loading
 function waitForImageLoad(img: HTMLImageElement, timeoutMs = 5000): Promise<void> {
   return new Promise((resolve) => {
-    if (img.complete) {
+    if (img.complete && img.naturalWidth > 0) {
       resolve();
       return;
     }
@@ -21,9 +21,81 @@ function waitForImageLoad(img: HTMLImageElement, timeoutMs = 5000): Promise<void
   });
 }
 
-// Convert an image to base64 using Canvas first, then background CORS proxy
-async function imageToBase64(img: HTMLImageElement): Promise<string> {
+// Wait for an image to have valid dimensions (loaded and rendered)
+function waitForImageReady(img: HTMLImageElement, timeoutMs = 8000): Promise<void> {
+  return new Promise((resolve) => {
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      resolve();
+      return;
+    }
+    const start = Date.now();
+    const check = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        resolve();
+      } else if (Date.now() - start > timeoutMs) {
+        resolve();
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    requestAnimationFrame(check);
+  });
+}
+
+// Wait for new images to appear in a container (Gemini renders images asynchronously)
+function waitForNewImages(container: Element, existingCount: number, timeoutMs = 10000): Promise<void> {
+  return new Promise((resolve) => {
+    const currentImages = container.querySelectorAll('img');
+    if (currentImages.length > existingCount) {
+      resolve();
+      return;
+    }
+    const start = Date.now();
+    const observer = new MutationObserver(() => {
+      const newImages = container.querySelectorAll('img');
+      if (newImages.length > existingCount) {
+        observer.disconnect();
+        resolve();
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    const check = setInterval(() => {
+      const newImages = container.querySelectorAll('img');
+      if (newImages.length > existingCount || Date.now() - start > timeoutMs) {
+        observer.disconnect();
+        clearInterval(check);
+        resolve();
+      }
+    }, 500);
+  });
+}
+
+// Get the effective image URL, handling lazy-loaded images
+function getImageSrc(img: HTMLImageElement): string {
   const src = img.getAttribute('src') || '';
+  if (src && !src.startsWith('data:image/svg') && src !== 'data:,') return src;
+
+  const dataSrc = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
+  if (dataSrc) return dataSrc;
+
+  const srcset = img.getAttribute('srcset') || '';
+  if (srcset) {
+    const firstEntry = srcset.split(',')[0].trim().split(/\s+/)[0];
+    if (firstEntry) return firstEntry;
+  }
+
+  const bgImage = getComputedStyle(img).backgroundImage;
+  if (bgImage && bgImage !== 'none') {
+    const match = bgImage.match(/url\(["']?([^"')]+)["']?\)/);
+    if (match) return match[1];
+  }
+
+  return src;
+}
+
+// Convert an image to base64 using Canvas first, then direct fetch, then background CORS proxy
+async function imageToBase64(img: HTMLImageElement): Promise<string> {
+  const src = getImageSrc(img);
   if (!src) return '';
 
   // Already base64
@@ -51,9 +123,12 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
     }
   }
 
-  // 2. Try direct fetch from content script
+  // 2. Try direct fetch from content script (with timeout)
   try {
-    const resp = await fetch(src, { credentials: 'include' });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(src, { signal: controller.signal, credentials: 'include' });
+    clearTimeout(timer);
     if (resp.ok) {
       const blob = await resp.blob();
       return await new Promise((resolve, reject) => {
@@ -64,7 +139,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
       });
     }
   } catch (_) {
-    // Cross-origin blocked — fall through
+    // Cross-origin blocked / timeout — fall through
   }
 
   // 3. Background CORS proxy (with timeout)
@@ -80,22 +155,50 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
 }
 
 export const scrapeGemini = async (): Promise<any> => {
-  const messageBlocks = document.querySelectorAll('.query-content, message-content, .message-content');
-  if (messageBlocks.length === 0) {
+  const allBlocks = document.querySelectorAll('.query-content, .response-content, message-content, .message-content');
+  if (allBlocks.length === 0) {
     throw new Error('No messages found. Are you inside a Gemini conversation?');
   }
 
-  // Pre-load all images on the page
+  // Deduplicate: remove blocks that are children of other selected blocks
+  const messageBlocks = Array.from(allBlocks).filter(block => {
+    return !Array.from(allBlocks).some(other => other !== block && other.contains(block));
+  });
+
+  // Gemini renders AI-generated images asynchronously — wait for them to appear
+  for (const block of messageBlocks) {
+    const isAssistant = block.classList.contains('response-content') ||
+                        block.tagName.toLowerCase() === 'message-content' || 
+                        block.classList.contains('message-content') ||
+                        block.closest('message-content') !== null;
+    if (!isAssistant) continue;
+
+    // Walk up to find the broadest assistant container
+    let current = block.parentElement;
+    let container = block as HTMLElement;
+    while (current && current !== document.body) {
+      const containsOther = messageBlocks.some(b => b !== block && current!.contains(b));
+      if (containsOther) break;
+      container = current;
+      current = current.parentElement;
+    }
+
+    const existingCount = container.querySelectorAll('img').length;
+    await waitForNewImages(container, existingCount, 10000);
+  }
+
+  // Pre-load all images on the page (with longer timeout for generated images)
   const allPageImages = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
-  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 3000)));
+  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 8000)));
 
   const messages: Message[] = [];
   let imageCount = 0;
   let fileCount = 0;
 
-  for (const block of Array.from(messageBlocks)) {
+  for (const block of messageBlocks) {
     let role: 'user' | 'assistant' = 'user';
-    const isAssistant = block.tagName.toLowerCase() === 'message-content' || 
+    const isAssistant = block.classList.contains('response-content') ||
+                        block.tagName.toLowerCase() === 'message-content' || 
                         block.classList.contains('message-content') ||
                         block.closest('message-content') !== null;
     if (isAssistant) {
@@ -107,9 +210,33 @@ export const scrapeGemini = async (): Promise<any> => {
 
     const files: AttachedFile[] = [];
 
-    const images = block.querySelectorAll('img');
-    for (const img of Array.from(images)) {
-      const src = img.getAttribute('src') || '';
+    // Walk up to find the broadest container that only contains this block
+    let current = block.parentElement;
+    let messageContainer = block as HTMLElement;
+    while (current && current !== document.body) {
+      const containsOther = messageBlocks.some(b => b !== block && current!.contains(b));
+      if (containsOther) break;
+      messageContainer = current;
+      current = current.parentElement;
+    }
+
+    // Collect images from the broadest container, including lazy-loaded and background images
+    const imgSet = new Set<HTMLImageElement>();
+    messageContainer.querySelectorAll('img').forEach(img => imgSet.add(img as HTMLImageElement));
+    messageContainer.querySelectorAll('[style*="background-image"]').forEach(el => {
+      const bg = getComputedStyle(el).backgroundImage;
+      if (bg && bg !== 'none') {
+        const match = bg.match(/url\(["']?([^"')]+)["']?\)/);
+        if (match && match[1]) {
+          const syntheticImg = new Image();
+          syntheticImg.src = match[1];
+          imgSet.add(syntheticImg);
+        }
+      }
+    });
+
+    for (const img of Array.from(imgSet)) {
+      const src = getImageSrc(img);
       const alt = img.getAttribute('alt') || '';
 
       const isAvatarOrProfile = 
@@ -123,7 +250,25 @@ export const scrapeGemini = async (): Promise<any> => {
       if (isAvatarOrProfile) continue;
 
       if (src) {
-        const base64 = await imageToBase64(img);
+        // Wait for this specific image to be fully ready
+        await waitForImageReady(img, 8000);
+
+        let base64 = await imageToBase64(img);
+        
+        // Retry 1: wait 2s for async image loading
+        if (!base64 || base64.length <= 100) {
+          await new Promise(r => setTimeout(r, 2000));
+          await waitForImageReady(img, 5000);
+          base64 = await imageToBase64(img);
+        }
+
+        // Retry 2: wait 3 more seconds (Gemini images can be slow to render)
+        if (!base64 || base64.length <= 100) {
+          await new Promise(r => setTimeout(r, 3000));
+          await waitForImageReady(img, 5000);
+          base64 = await imageToBase64(img);
+        }
+
         if (base64 && base64.length > 100) {
           const isDup = files.some(f => f.content === base64);
           if (!isDup) {
@@ -134,11 +279,21 @@ export const scrapeGemini = async (): Promise<any> => {
             });
             imageCount++;
           }
+        } else if (src && !src.startsWith('data:')) {
+          // All conversion attempts failed — store the URL as a reference
+          console.warn('[MoveChat] Image conversion failed, storing URL:', src.substring(0, 100));
+          files.push({
+            name: alt || `gemini-image-${imageCount + 1}.png`,
+            type: 'image/url',
+            content: src,
+            size: 0
+          });
+          imageCount++;
         }
       }
     }
 
-    const filePills = block.querySelectorAll('[class*="attachment"], [class*="chip"], [class*="file"]');
+    const filePills = messageContainer.querySelectorAll('[class*="attachment"], [class*="chip"], [class*="file"]');
     for (const pill of Array.from(filePills)) {
       const fileName = pill.textContent || 'File';
       const cleaned = fileName.trim();

@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "MoveChat",
+  "name": "MoveChat: Export & Transfer AI Chats (ChatGPT, Claude & Gemini)",
   "version": "0.1.0",
   "description": "Capture AI chat sessions and resume them in a new chat on any platform.",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "permissions": [
     "activeTab",
     "storage",
@@ -14,7 +17,17 @@
     "https://claude.ai/*",
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
-    "*://*/*"
+    "https://*.oaiusercontent.com/*",
+    "https://*.googleusercontent.com/*",
+    "https://*.gstatic.com/*",
+    "https://*.google.com/*",
+    "https://*.ggpht.com/*",
+    "https://*.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://images.unsplash.com/*",
+    "https://*.imgur.com/*"
   ],
   "action": {
     "default_popup": "index.html",

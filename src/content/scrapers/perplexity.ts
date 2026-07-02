@@ -1,29 +1,112 @@
 import type { Message, AttachedFile } from '../../shared/types';
 import { elementToMarkdown } from '../dom';
 
-async function toBase64(url: string): Promise<string> {
+// Wait for an image element to complete loading
+function waitForImageLoad(img: HTMLImageElement, timeoutMs = 5000): Promise<void> {
+  return new Promise((resolve) => {
+    if (img.complete) {
+      resolve();
+      return;
+    }
+    const onLoad = () => { cleanup(); resolve(); };
+    const onError = () => { cleanup(); resolve(); };
+    const timer = setTimeout(() => { cleanup(); resolve(); }, timeoutMs);
+    const cleanup = () => {
+      img.removeEventListener('load', onLoad);
+      img.removeEventListener('error', onError);
+      clearTimeout(timer);
+    };
+    img.addEventListener('load', onLoad);
+    img.addEventListener('error', onError);
+  });
+}
+
+// Get the effective image URL, handling lazy-loaded images
+function getImageSrc(img: HTMLImageElement): string {
+  const src = img.getAttribute('src') || '';
+  if (src && !src.startsWith('data:image/svg') && src !== 'data:,') return src;
+
+  const dataSrc = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
+  if (dataSrc) return dataSrc;
+
+  const srcset = img.getAttribute('srcset') || '';
+  if (srcset) {
+    const firstEntry = srcset.split(',')[0].trim().split(/\s+/)[0];
+    if (firstEntry) return firstEntry;
+  }
+
+  return src;
+}
+
+// Convert an image to base64: canvas → direct fetch → background CORS proxy
+async function imageToBase64(img: HTMLImageElement): Promise<string> {
+  const src = getImageSrc(img);
+  if (!src) return '';
+
+  // Already base64
+  if (src.startsWith('data:')) return src;
+
+  // Wait until the image is loaded
+  await waitForImageLoad(img);
+
+  // 1. Try canvas (works for same-origin)
+  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL('image/png');
+        if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
+          return dataUrl;
+        }
+      }
+    } catch (_) {
+      // Tainted canvas — fall through
+    }
+  }
+
+  // 2. Try direct fetch from content script (with timeout)
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const resp = await fetch(url, { signal: controller.signal });
+    const resp = await fetch(src, { signal: controller.signal, credentials: 'include' });
     clearTimeout(timer);
-    const blob = await resp.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (err) {
-    console.error('[MoveChat] Image conversion failed:', err);
-    return '';
+    if (resp.ok) {
+      const blob = await resp.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch (_) {
+    // Cross-origin blocked / timeout — fall through
   }
+
+  // 3. Background CORS proxy (with timeout)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve('');
+    }, 5000);
+    chrome.runtime.sendMessage({ action: 'FETCH_IMAGE_BASE64', url: src }, (resp) => {
+      clearTimeout(timer);
+      resolve(resp?.base64 || '');
+    });
+  });
 }
 
 export const scrapePerplexity = async (): Promise<any> => {
   const messages: Message[] = [];
   let imageCount = 0;
   let fileCount = 0;
+
+  // Pre-load all images on the page before scraping
+  const allPageImages = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
+  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 3000)));
 
   // Try modern Perplexity DOM structure first:
   //   - User queries:     span.select-text (inside a query container)
@@ -58,7 +141,7 @@ export const scrapePerplexity = async (): Promise<any> => {
       const images = block.querySelectorAll('img');
 
       for (const img of Array.from(images)) {
-        const src = img.getAttribute('src') || '';
+        const src = getImageSrc(img);
         const alt = img.getAttribute('alt') || '';
 
         const isAvatarOrProfile = 
@@ -72,23 +155,26 @@ export const scrapePerplexity = async (): Promise<any> => {
         if (isAvatarOrProfile) continue;
 
         if (src) {
-          if (src.startsWith('data:')) {
+          let base64 = await imageToBase64(img);
+          if (!base64 || base64.length <= 100) {
+            await new Promise(r => setTimeout(r, 2000));
+            base64 = await imageToBase64(img);
+          }
+          if (base64 && base64.length > 100) {
             files.push({
               name: alt || `perplexity-image-${imageCount + 1}.png`,
               type: 'image/png',
-              content: src
+              content: base64
             });
             imageCount++;
-          } else {
-            const base64 = await toBase64(src);
-            if (base64) {
-              files.push({
-                name: alt || `perplexity-image-${imageCount + 1}.png`,
-                type: 'image/png',
-                content: base64
-              });
-              imageCount++;
-            }
+          } else if (src && !src.startsWith('data:')) {
+            files.push({
+              name: alt || `perplexity-image-${imageCount + 1}.png`,
+              type: 'image/url',
+              content: src,
+              size: 0
+            });
+            imageCount++;
           }
         }
       }
@@ -108,8 +194,65 @@ export const scrapePerplexity = async (): Promise<any> => {
       if (i < userQuerySpans.length) {
         const userEl = userQuerySpans[i];
         const text = elementToMarkdown(userEl).trim();
+
+        // Walk up to find the broadest user message container
+        let userContainer = userEl as HTMLElement;
+        let current = userEl.parentElement;
+        while (current && current !== document.body) {
+          const hasOtherMessage = Array.from(userQuerySpans).some(s => s !== userEl && current!.contains(s)) ||
+                                   Array.from(answerContainers).some(a => current!.contains(a));
+          if (hasOtherMessage) break;
+          userContainer = current;
+          current = current.parentElement;
+        }
+
+        const userFiles: AttachedFile[] = [];
+        const userImages = userContainer.querySelectorAll('img');
+        for (const img of Array.from(userImages)) {
+          const src = getImageSrc(img);
+          const alt = img.getAttribute('alt') || '';
+
+          const isAvatarOrProfile = 
+            src.includes('profile') || 
+            src.includes('avatar') || 
+            src.includes('logo') ||
+            alt.toLowerCase().includes('avatar') ||
+            alt.toLowerCase().includes('profile') ||
+            img.closest('[class*="avatar"], [class*="profile"], [class*="user-icon"]') !== null;
+
+          if (isAvatarOrProfile) continue;
+
+          if (src) {
+            let base64 = await imageToBase64(img);
+            if (!base64 || base64.length <= 100) {
+              await new Promise(r => setTimeout(r, 2000));
+              base64 = await imageToBase64(img);
+            }
+            if (base64 && base64.length > 100) {
+              userFiles.push({
+                name: alt || `perplexity-image-${imageCount + 1}.png`,
+                type: 'image/png',
+                content: base64
+              });
+              imageCount++;
+            } else if (src && !src.startsWith('data:')) {
+              userFiles.push({
+                name: alt || `perplexity-image-${imageCount + 1}.png`,
+                type: 'image/url',
+                content: src,
+                size: 0
+              });
+              imageCount++;
+            }
+          }
+        }
+
         if (text) {
-          messages.push({ role: 'user', content: text });
+          messages.push({ 
+            role: 'user', 
+            content: text,
+            files: userFiles.length > 0 ? userFiles : undefined
+          });
         }
       }
 
@@ -124,7 +267,7 @@ export const scrapePerplexity = async (): Promise<any> => {
         const images = answerEl.querySelectorAll('img');
 
         for (const img of Array.from(images)) {
-          const src = img.getAttribute('src') || '';
+          const src = getImageSrc(img);
           const alt = img.getAttribute('alt') || '';
 
           const isAvatarOrProfile = 
@@ -138,23 +281,26 @@ export const scrapePerplexity = async (): Promise<any> => {
           if (isAvatarOrProfile) continue;
 
           if (src) {
-            if (src.startsWith('data:')) {
+            let base64 = await imageToBase64(img);
+            if (!base64 || base64.length <= 100) {
+              await new Promise(r => setTimeout(r, 2000));
+              base64 = await imageToBase64(img);
+            }
+            if (base64 && base64.length > 100) {
               files.push({
                 name: alt || `perplexity-image-${imageCount + 1}.png`,
                 type: 'image/png',
-                content: src
+                content: base64
               });
               imageCount++;
-            } else {
-              const base64 = await toBase64(src);
-              if (base64) {
-                files.push({
-                  name: alt || `perplexity-image-${imageCount + 1}.png`,
-                  type: 'image/png',
-                  content: base64
-                });
-                imageCount++;
-              }
+            } else if (src && !src.startsWith('data:')) {
+              files.push({
+                name: alt || `perplexity-image-${imageCount + 1}.png`,
+                type: 'image/url',
+                content: src,
+                size: 0
+              });
+              imageCount++;
             }
           }
         }

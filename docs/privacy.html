@@ -71,13 +71,36 @@
       <tr><td><code>storage</code></td><td>Store conversations, settings, and API keys locally</td></tr>
       <tr><td><code>tabs</code></td><td>Open new tabs when resuming conversations on other platforms</td></tr>
       <tr><td><code>scripting</code></td><td>Inject content scripts into chat platform pages</td></tr>
-      <tr><td><code>*://*/*</code></td><td>Fetch images from third-party CDNs for PDF export</td></tr>
     </table>
-    <p>The broad <code>*://*/*</code> host permission exists solely because images in conversations may be hosted on CDNs outside the four main platform domains (e.g., OpenAI's DALL-E images on Azure Blob Storage). This permission is used only for fetching those images, not for accessing any other data.</p>
+
+    <h3>Host Permissions</h3>
+    <table>
+      <tr><th>Host Pattern</th><th>Purpose</th></tr>
+      <tr><td><code>chatgpt.com</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>claude.ai</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>gemini.google.com</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>perplexity.ai</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>*.oaiusercontent.com</code></td><td>Fetch ChatGPT-generated images for PDF export</td></tr>
+      <tr><td><code>*.googleusercontent.com</code></td><td>Fetch Gemini-generated images for PDF export</td></tr>
+      <tr><td><code>*.gstatic.com</code></td><td>Fetch Google static assets for PDF export</td></tr>
+      <tr><td><code>*.google.com</code></td><td>Fetch Google image proxy content for PDF export</td></tr>
+      <tr><td><code>*.ggpht.com</code></td><td>Fetch Google Photos content for PDF export</td></tr>
+      <tr><td><code>*.anthropic.com</code></td><td>Fetch Claude-hosted images for PDF export</td></tr>
+      <tr><td><code>api.openai.com</code></td><td>AI Summary feature (OpenAI API, if configured by user)</td></tr>
+      <tr><td><code>api.anthropic.com</code></td><td>AI Summary feature (Anthropic API, if configured by user)</td></tr>
+      <tr><td><code>generativelanguage.googleapis.com</code></td><td>AI Summary feature (Gemini API, if configured by user)</td></tr>
+      <tr><td><code>images.unsplash.com</code></td><td>Fetch Unsplash images for PDF export</td></tr>
+      <tr><td><code>*.imgur.com</code></td><td>Fetch Imgur-hosted images for PDF export</td></tr>
+    </table>
+    <p>Host permissions are limited to the specific domains the extension interacts with. Images may be hosted on CDNs outside the four main platform domains, so additional image hosting domains are included to ensure conversations with images can be exported correctly. These permissions are used only for fetching images, not for accessing any other data.</p>
 
     <h2>Third-Party Services</h2>
     <p>MoveChat does not integrate with any third-party analytics, advertising, or tracking services.</p>
-    <p>The only external communication is between your browser and the AI provider API endpoint you explicitly configure (e.g., <code>api.openai.com</code> for OpenAI). This communication is initiated by you, not by the extension.</p>
+    <p>The only external communication is between your browser and:</p>
+    <ul>
+      <li><strong>AI provider APIs</strong> — only if you configure AI Summary (e.g., <code>api.openai.com</code>, <code>api.anthropic.com</code>, <code>generativelanguage.googleapis.com</code>). This communication is initiated by you, not by the extension.</li>
+      <li><strong>Image CDN domains</strong> — when exporting conversations that contain images hosted outside the main platform (e.g., <code>oaiusercontent.com</code>, <code>googleusercontent.com</code>). These fetches are triggered during PDF/ZIP export only.</li>
+    </ul>
 
     <h2>Open Source</h2>
     <p>MoveChat is open source under the MIT License. You can review the full source code at <a href="https://github.com/VC067/MoveChat">github.com/VC067/MoveChat</a> to verify these claims.</p>
