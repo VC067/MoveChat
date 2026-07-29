@@ -1,149 +1,193 @@
-<h1 align="center">MoveChat</h1>
+<div align="center">
 
-<p align="center">
-  <img src="docs/hero.png" alt="MoveChat — Save any AI conversation in one click" width="500" />
-</p>
+  <img src="docs/hero.png" alt="MoveChat Logo" width="160" style="border-radius: 20px; margin-bottom: 12px;" />
 
-<p align="center">
-  <strong>Capture AI chat sessions and resume them in a new chat on any platform.</strong>
-</p>
+  # 🚀 MoveChat
+  ### **Seamlessly Transfer, Export, and Resume AI Conversations Across Platforms**
+
+  [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/cgpfngggfccdpjppachknliainihkbdg?color=4285F4&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blueviolet.svg)](public/manifest.json)
+  [![Open Source](https://img.shields.io/badge/Open%20Source-%E2%9D%A4%EF%B8%8F-brightgreen.svg)](#)
+
+  <p align="center">
+    <strong>Ever got stuck in a long Claude thread and wished you could instantly jump to ChatGPT, Gemini, or Perplexity without losing text, code blocks, images, or attached files?</strong><br/>
+    MoveChat is a free, 100% open-source, privacy-first Chrome extension that lets you capture, transfer, and export your AI chats in 1-click.
+  </p>
+
+  <p align="center">
+    <a href="https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb">
+      <img src="https://img.shields.io/badge/Add%20to%20Chrome-Free%20%26%20Open%20Source-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Install MoveChat on Chrome" />
+    </a>
+  </p>
+
+  ---
+
+  ### 🌟 **Live Demo**
+
+  ![MoveChat Demo](MoveChat-video.gif)
+
+  *Watch MoveChat capture an active AI conversation (including images & attachments) and seamlessly transfer it to a fresh chat on another platform in seconds.*
+
+</div>
 
 ---
 
-## The Problem
+## ⭐ Give Us A Star!
 
-You're deep in a conversation on Claude but want to continue on ChatGPT. Or you hit a context limit and need to transfer your full history to a fresh chat. Currently, you'd have to manually copy-paste everything.
+If MoveChat helps you switch between AI platforms effortlessly, **please consider giving this repository a ⭐ star!** It helps other developers and AI users discover this open-source tool.
 
-## What MoveChat Does
+---
 
-- **Capture** your full conversation (text, images, files) from any supported platform
-- **Store** it locally in your browser — nothing leaves your device
-- **Transfer** it to a new chat on any other platform with a single click
+## ✨ Why MoveChat?
 
-## Supported Platforms
+| Feature | Description |
+| :--- | :--- |
+| ⚡ **1-Click Seamless Transfer** | Capture chat threads on one AI platform and resume them instantly on another without losing context. |
+| 🔒 **100% Local & Safe** | All data stays strictly in your browser (`chrome.storage.local`). Zero tracking, zero telemetry, zero external servers. |
+| 🖼️ **Full Media & File Support** | Automatically extracts code blocks, inline images, generated artifacts, and attached documents during handoff. |
+| 📄 **Multi-Format Export** | Export any AI conversation to **Markdown (`.md`)**, **PDF**, or raw **JSON** for offline notes & documentation. |
+| 🧠 **Optional AI Compression** | Summarize long, verbose chat histories using your own API key (OpenAI / Anthropic / Gemini) before transferring. |
+| 🛡️ **Manifest V3 Compliant** | Built adhering strictly to Chrome Web Store MV3 security, privacy, and performance guidelines. |
 
-| Platform | Capture | Resume |
-|----------|---------|--------|
-| ChatGPT | ✅ | ✅ |
-| Claude | ✅ | ✅ |
-| Gemini | ✅ | ✅ |
-| Perplexity | ✅ | ✅ |
+---
 
-## Installation
+## 🌐 Supported Platforms
 
-### From Chrome Web Store
+MoveChat offers full bidirectional capture and handoff across all major AI chat platforms:
 
-[Move Chat](https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb)
+| Platform | Capture Session | Resume Chat | Images & Media | File Attachments |
+| :--- | :---: | :---: | :---: | :---: |
+| **ChatGPT** (`chatgpt.com`) | ✅ | ✅ | ✅ | ✅ |
+| **Claude** (`claude.ai`) | ✅ | ✅ | ✅ | ✅ |
+| **Gemini** (`gemini.google.com`) | ✅ | ✅ | ✅ | ✅ |
+| **Perplexity** (`perplexity.ai`) | ✅ | ✅ | ✅ | ✅ |
 
+---
 
-### From Source
+## 🚀 How It Works
 
-1. Clone the repo
+```mermaid
+graph LR
+    A[Active AI Chat<br/>Claude / ChatGPT / Gemini / Perplexity] -->|1-Click Capture| B(MoveChat Extension)
+    B -->|Stored Locally| C[Browser Local Storage<br/>chrome.storage.local]
+    C -->|1-Click Resume| D[Target AI Platform<br/>ChatGPT / Claude / Gemini / Perplexity]
+    C -->|Export| E[Markdown .md / PDF / JSON]
+```
 
+1. **Capture**: Click **"Capture this session"** in the MoveChat popup while viewing an active conversation. MoveChat safely reads the thread, extracting text, code blocks, images, and attachments.
+2. **Store**: Conversations are saved locally on your device in structured JSON format. You can search, review, or organize your session library anytime.
+3. **Resume**: Select any target AI platform and click **"Resume in new chat"**. MoveChat automatically opens the target platform, populates the prompt, attaches your files/images, and lets you continue where you left off.
+
+---
+
+## 📦 Installation
+
+### Option 1: Chrome Web Store (Recommended)
+
+Get MoveChat directly from the official Chrome Web Store:
+
+👉 **[Install MoveChat from Chrome Web Store](https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb)**
+
+---
+
+### Option 2: Build & Load from Source (Developer Mode)
+
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/VC067/MoveChat.git
+   cd MoveChat
    ```
 
-2. Install dependencies
-
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-3. Build the extension
-
+3. **Build the production extension:**
    ```bash
    npm run build
    ```
 
-4. Open `chrome://extensions` in your browser
-5. Enable **Developer mode** (toggle in top right)
-6. Click **Load unpacked** and select the `dist/` folder
+4. **Load into Google Chrome:**
+   - Open `chrome://extensions` in your browser.
+   - Enable **Developer mode** (toggle switch in top right corner).
+   - Click **Load unpacked** and select the generated `dist/` directory.
 
-The MoveChat icon should now appear in your browser toolbar.
+---
 
-## Development
+## 🛠️ Development & Scripts
 
 ```bash
+# Start Vite development server
 npm run dev
+
+# Type-check and build production bundle (outputs to /dist)
+npm run build
+
+# Lint source files
+npm run lint
 ```
 
-Then reload the extension in `chrome://extensions` to pick up changes. Or use Vite's dev mode with HMR.
+---
 
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Build for production (TypeScript + Vite) |
-| `npm run lint` | Run ESLint |
-
-## Architecture
+## 🏗️ Project Architecture
 
 ```
-src/
-├── popup/                  # Extension popup UI (React + Tailwind)
-│   ├── components/
-│   │   ├── Header.tsx
-│   │   ├── LibraryView.tsx
-│   │   ├── PlatformLogo.tsx
-│   │   ├── SessionDetailView.tsx
-│   │   └── SettingsView.tsx
-│   └── hooks/
-│       └── useStorage.ts
-├── content/                # Content scripts
-│   ├── scrapers/           # Extract conversations from each platform
-│   ├── injectors/          # Paste conversations into target platforms
-│   ├── dom.ts              # DOM utilities
-│   ├── index.ts            # Content script entry point
-│   └── storage.ts          # Storage helpers
-├── background/
-│   └── index.ts            # Service worker (navigation + image fetch)
-└── shared/
-    ├── types.ts            # TypeScript interfaces
-    ├── storage.ts          # Chrome storage abstraction
-    ├── compress.ts         # AI-powered conversation compression
-    ├── markdown.ts         # Markdown export
-    └── pdf.ts              # PDF export
+MoveChat/
+├── src/
+│   ├── popup/                  # Extension Popup UI (React + Tailwind CSS)
+│   │   ├── components/         # Header, LibraryView, SessionDetailView, SettingsView, etc.
+│   │   └── hooks/              # Custom Chrome Storage Hooks
+│   ├── content/                # Content Scripts (Runs on AI web apps)
+│   │   ├── scrapers/           # ChatGPT, Claude, Gemini & Perplexity scrapers
+│   │   ├── injectors/          # Prompt & file injectors for each target platform
+│   │   ├── dom.ts              # DOM parsing & HTML-to-Markdown converter
+│   │   ├── index.ts            # Content script entry point & message listener
+│   │   └── storage.ts          # Content script storage helper
+│   ├── background/             # Service Worker (Tab navigation & CORS image proxy)
+│   │   └── index.ts
+│   └── shared/                 # Core Utilities & Types
+│       ├── types.ts            # Data interfaces (Session, Message, AttachedFile)
+│       ├── storage.ts          # Chrome storage wrapper
+│       ├── markdown.ts         # Markdown exporter
+│       ├── pdf.ts              # PDF exporter (jsPDF)
+│       └── compress.ts         # Optional AI summary/compression engine
+└── public/
+    └── manifest.json           # Chrome Manifest V3 configuration
 ```
 
-### How It Works
+---
 
-1. **Capture:** When you click "Capture this session," the popup sends a message to a content script running on the active tab. The scraper reads the DOM, extracts messages and images, and sends them back.
+## 🛡️ Privacy, Safety & Permissions
 
-2. **Store:** Conversations are saved to `chrome.storage.local` as structured JSON.
+MoveChat is engineered with a strict **privacy-first principle**:
 
-3. **Resume:** When you click "Resume in new chat," the extension opens a new tab on the target platform and injects the conversation history via a content script.
+- 🔒 **Zero Remote Analytics or Tracking**: We do not collect, track, or transmit any user data.
+- 💾 **100% On-Device Storage**: All captured sessions, images, settings, and optional API keys remain inside `chrome.storage.local`.
+- 🔐 **Scoped Host Permissions**: Host permissions are strictly restricted to supported AI web domains (`chatgpt.com`, `claude.ai`, `gemini.google.com`, `perplexity.ai`) and necessary image CDNs (`*.googleusercontent.com`, `*.oaiusercontent.com`).
 
-## Permissions
+| Permission | Purpose |
+| :--- | :--- |
+| `activeTab` | Read conversation elements on the active tab when requested by the user |
+| `storage` | Store chat sessions, settings, and exports locally on your machine |
+| `tabs` | Open a new tab when resuming conversations on another platform |
+| `scripting` | Inject content scripts for chat scraping and prompt injection |
 
-MoveChat requests the following permissions:
+For complete details, view our [Privacy Policy](https://vc067.github.io/MoveChat/privacy).
 
-| Permission | Why |
-|-----------|-----|
-| `activeTab` | Access the current tab to capture conversations |
-| `storage` | Store conversations, settings, and API keys locally |
-| `tabs` | Open new tabs when resuming on another platform |
-| `scripting` | Dynamically inject content scripts |
+---
 
-Host permissions are scoped to specific domains (`chatgpt.com`, `claude.ai`, `gemini.google.com`, `perplexity.ai`, plus image CDNs like `*.oaiusercontent.com`, `*.googleusercontent.com`, etc.) — see `manifest.json` for the full list.
+## 📄 License
 
-See [docs/privacy.html](https://vc067.github.io/MoveChat/privacy) for our full privacy policy.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
-## Privacy
+---
 
-- All data stays on your device (`chrome.storage.local`)
-- No analytics, no tracking, no remote servers
-- API keys are stored locally and sent only to your chosen provider
+<div align="center">
 
-See [docs/privacy.html](https://vc067.github.io/MoveChat/privacy) for our full privacy policy.
+  ### **Enjoying MoveChat? Don't forget to ⭐ star the repository!**
 
-## Contributing
+  [Report Bug](https://github.com/VC067/MoveChat/issues) · [Request Feature](https://github.com/VC067/MoveChat/issues)
 
-This project is not accepting code contributions at this time.
-
-If you find a bug or have a feature idea, please open an [issue](https://github.com/VC067/MoveChat/issues).
-
-## License
-
-[MIT](LICENSE) — see [LICENSE](LICENSE) for details.
+</div>
