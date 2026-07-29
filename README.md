@@ -1,9 +1,15 @@
 <div align="center">
 
-  <img src="docs/hero.png" alt="MoveChat Logo" width="160" style="border-radius: 20px; margin-bottom: 12px;" />
-
   # 🚀 MoveChat
   ### **Seamlessly Transfer, Export, and Resume AI Conversations Across Platforms**
+
+  <br/>
+
+  <p align="center">
+    <img src="MoveChat-video.gif" alt="MoveChat Demo" width="750" style="border-radius: 10px;" />
+  </p>
+
+  <br/>
 
   [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/cgpfngggfccdpjppachknliainihkbdg?color=4285F4&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -20,14 +26,6 @@
       <img src="https://img.shields.io/badge/Add%20to%20Chrome-Free%20%26%20Open%20Source-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Install MoveChat on Chrome" />
     </a>
   </p>
-
-  ---
-
-  ### 🌟 **Live Demo**
-
-  ![MoveChat Demo](MoveChat-video.gif)
-
-  *Watch MoveChat capture an active AI conversation (including images & attachments) and seamlessly transfer it to a fresh chat on another platform in seconds.*
 
 </div>
 
