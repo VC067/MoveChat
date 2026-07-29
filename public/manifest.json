@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "MoveChat: Export & Transfer AI Chats (ChatGPT, Claude & Gemini)",
+  "version": "0.1.1",
+  "description": "Capture AI chat sessions and resume them in a new chat on any platform.",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://www.perplexity.ai/*",
+    "https://*.oaiusercontent.com/*",
+    "https://*.googleusercontent.com/*",
+    "https://*.gstatic.com/*",
+    "https://*.google.com/*",
+    "https://*.ggpht.com/*",
+    "https://*.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://images.unsplash.com/*",
+    "https://*.imgur.com/*"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
