@@ -99,7 +99,10 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
   });
 }
 
-export const scrapePerplexity = async (): Promise<any> => {
+export const scrapePerplexity = async (
+  onProgress?: (current: number, total: number, step: string) => void
+): Promise<any> => {
+  onProgress?.(0, 1, 'Finding Perplexity messages...');
   const messages: Message[] = [];
   let imageCount = 0;
   let fileCount = 0;

@@ -42,33 +42,7 @@ function waitForImageReady(img: HTMLImageElement, timeoutMs = 8000): Promise<voi
   });
 }
 
-// Wait for new images to appear in a container (Gemini renders images asynchronously)
-function waitForNewImages(container: Element, existingCount: number, timeoutMs = 10000): Promise<void> {
-  return new Promise((resolve) => {
-    const currentImages = container.querySelectorAll('img');
-    if (currentImages.length > existingCount) {
-      resolve();
-      return;
-    }
-    const start = Date.now();
-    const observer = new MutationObserver(() => {
-      const newImages = container.querySelectorAll('img');
-      if (newImages.length > existingCount) {
-        observer.disconnect();
-        resolve();
-      }
-    });
-    observer.observe(container, { childList: true, subtree: true });
-    const check = setInterval(() => {
-      const newImages = container.querySelectorAll('img');
-      if (newImages.length > existingCount || Date.now() - start > timeoutMs) {
-        observer.disconnect();
-        clearInterval(check);
-        resolve();
-      }
-    }, 500);
-  });
-}
+
 
 // Get the effective image URL, handling lazy-loaded images
 function getImageSrc(img: HTMLImageElement): string {
@@ -154,7 +128,11 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
   });
 }
 
-export const scrapeGemini = async (): Promise<any> => {
+export const scrapeGemini = async (
+  onProgress?: (current: number, total: number, step: string) => void
+): Promise<any> => {
+  onProgress?.(0, 1, 'Finding Gemini messages...');
+
   const querySelectors = [
     'user-query',
     'model-response',
@@ -191,40 +169,20 @@ export const scrapeGemini = async (): Promise<any> => {
     return !rawBlocks.some(other => other !== block && other.contains(block));
   });
 
-  // Gemini renders AI-generated images asynchronously — wait for them to appear
-  for (const block of messageBlocks) {
-    const isAssistant =
-      block.tagName.toLowerCase().includes('model') ||
-      block.classList.contains('response-content') ||
-      block.classList.contains('model-response-container') ||
-      block.classList.contains('model-response-text') ||
-      block.getAttribute('data-test-id') === 'model-response' ||
-      block.closest('model-response, gmp-model-response, [data-test-id="model-response"]') !== null;
-    
-    if (!isAssistant) continue;
+  onProgress?.(0, messageBlocks.length, 'Loading images...');
 
-    let current = block.parentElement;
-    let container = block as HTMLElement;
-    while (current && current !== document.body) {
-      const containsOther = messageBlocks.some(b => b !== block && current!.contains(b));
-      if (containsOther) break;
-      container = current;
-      current = current.parentElement;
-    }
-
-    const existingCount = container.querySelectorAll('img').length;
-    await waitForNewImages(container, existingCount, 8000);
-  }
-
-  // Pre-load all images on the page
+  // Quick pre-load of images on the page (1.5s max timeout)
   const allPageImages = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
-  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 6000)));
+  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 1500)));
 
   const messages: Message[] = [];
   let imageCount = 0;
   let fileCount = 0;
 
-  for (const block of messageBlocks) {
+  for (let i = 0; i < messageBlocks.length; i++) {
+    const block = messageBlocks[i];
+    onProgress?.(i + 1, messageBlocks.length, `Processing message ${i + 1}/${messageBlocks.length}...`);
+
     const tag = block.tagName.toLowerCase();
     const testId = block.getAttribute('data-test-id') || '';
 
@@ -304,14 +262,8 @@ export const scrapeGemini = async (): Promise<any> => {
       if (isAvatarOrProfile) continue;
 
       if (src) {
-        await waitForImageReady(img, 6000);
+        await waitForImageReady(img, 1500);
         let base64 = await imageToBase64(img);
-
-        if (!base64 || base64.length <= 100) {
-          await new Promise(r => setTimeout(r, 1500));
-          await waitForImageReady(img, 4000);
-          base64 = await imageToBase64(img);
-        }
 
         if (base64 && base64.length > 100) {
           const isDup = files.some(f => f.content === base64);
