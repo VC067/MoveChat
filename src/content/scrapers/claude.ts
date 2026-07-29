@@ -95,7 +95,10 @@ async function imageToBase64(img: HTMLImageElement, log: (s:string)=>void): Prom
   });
 }
 
-export const scrapeClaude = async (): Promise<any> => {
+export const scrapeClaude = async (
+  onProgress?: (current: number, total: number, step: string) => void
+): Promise<any> => {
+  onProgress?.(0, 1, 'Finding Claude messages...');
   const debugLogs: string[] = [];
   const log = (msg: string) => {
     const line = `[${new Date().toISOString()}] ${msg}`;
@@ -125,6 +128,8 @@ export const scrapeClaude = async (): Promise<any> => {
 
   log(`Found ${rawMessageBlocks.length} raw blocks, reduced to ${uniqueBlocks.length} unique blocks`);
 
+  onProgress?.(0, uniqueBlocks.length, 'Loading images...');
+
   // Pre-load all images in the page before scraping
   const allPageImages = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
   log(`Found ${allPageImages.length} <img> tags on page. Waiting for them to load...`);
@@ -137,6 +142,7 @@ export const scrapeClaude = async (): Promise<any> => {
 
   for (let i = 0; i < uniqueBlocks.length; i++) {
     const block = uniqueBlocks[i];
+    onProgress?.(i + 1, uniqueBlocks.length, `Processing message ${i + 1}/${uniqueBlocks.length}...`);
     let role: 'user' | 'assistant' = 'user';
     const isAssistant = block.classList.contains('font-claude') || 
                         block.classList.contains('font-claude-response') ||
