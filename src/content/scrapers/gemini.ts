@@ -155,25 +155,54 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
 }
 
 export const scrapeGemini = async (): Promise<any> => {
-  const allBlocks = document.querySelectorAll('.query-content, .response-content, message-content, .message-content');
-  if (allBlocks.length === 0) {
-    throw new Error('No messages found. Are you inside a Gemini conversation?');
+  const querySelectors = [
+    'user-query',
+    'model-response',
+    'gmp-user-query',
+    'gmp-model-response',
+    '.query-content',
+    '.response-content',
+    'message-content',
+    '.message-content',
+    '[data-test-id="user-query"]',
+    '[data-test-id="model-response"]',
+    '.user-query-container',
+    '.model-response-container',
+    '.user-query-content',
+    '.model-response-text'
+  ];
+
+  let rawBlocks = Array.from(document.querySelectorAll(querySelectors.join(', ')));
+
+  // Fallback: search within conversation containers if specific component tags/classes were missed
+  if (rawBlocks.length === 0) {
+    const fallbackBlocks = document.querySelectorAll(
+      'conversation-container > *, chat-history > *, .conversation-container > *, [class*="conversation"] > [class*="message"]'
+    );
+    rawBlocks = Array.from(fallbackBlocks);
+  }
+
+  if (rawBlocks.length === 0) {
+    throw new Error('No messages found. Are you inside an active Gemini conversation?');
   }
 
   // Deduplicate: remove blocks that are children of other selected blocks
-  const messageBlocks = Array.from(allBlocks).filter(block => {
-    return !Array.from(allBlocks).some(other => other !== block && other.contains(block));
+  const messageBlocks = rawBlocks.filter(block => {
+    return !rawBlocks.some(other => other !== block && other.contains(block));
   });
 
   // Gemini renders AI-generated images asynchronously — wait for them to appear
   for (const block of messageBlocks) {
-    const isAssistant = block.classList.contains('response-content') ||
-                        block.tagName.toLowerCase() === 'message-content' || 
-                        block.classList.contains('message-content') ||
-                        block.closest('message-content') !== null;
+    const isAssistant =
+      block.tagName.toLowerCase().includes('model') ||
+      block.classList.contains('response-content') ||
+      block.classList.contains('model-response-container') ||
+      block.classList.contains('model-response-text') ||
+      block.getAttribute('data-test-id') === 'model-response' ||
+      block.closest('model-response, gmp-model-response, [data-test-id="model-response"]') !== null;
+    
     if (!isAssistant) continue;
 
-    // Walk up to find the broadest assistant container
     let current = block.parentElement;
     let container = block as HTMLElement;
     while (current && current !== document.body) {
@@ -184,33 +213,58 @@ export const scrapeGemini = async (): Promise<any> => {
     }
 
     const existingCount = container.querySelectorAll('img').length;
-    await waitForNewImages(container, existingCount, 10000);
+    await waitForNewImages(container, existingCount, 8000);
   }
 
-  // Pre-load all images on the page (with longer timeout for generated images)
+  // Pre-load all images on the page
   const allPageImages = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
-  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 8000)));
+  await Promise.all(allPageImages.map(img => waitForImageLoad(img, 6000)));
 
   const messages: Message[] = [];
   let imageCount = 0;
   let fileCount = 0;
 
   for (const block of messageBlocks) {
+    const tag = block.tagName.toLowerCase();
+    const testId = block.getAttribute('data-test-id') || '';
+
+    const isUserExplicit =
+      tag === 'user-query' ||
+      tag === 'gmp-user-query' ||
+      block.classList.contains('query-content') ||
+      block.classList.contains('user-query-container') ||
+      block.classList.contains('user-query-content') ||
+      testId === 'user-query' ||
+      block.closest('user-query, gmp-user-query, [data-test-id="user-query"]') !== null;
+
+    const isAssistantExplicit =
+      tag === 'model-response' ||
+      tag === 'gmp-model-response' ||
+      block.classList.contains('response-content') ||
+      block.classList.contains('model-response-container') ||
+      block.classList.contains('model-response-text') ||
+      testId === 'model-response' ||
+      block.closest('model-response, gmp-model-response, [data-test-id="model-response"]') !== null;
+
     let role: 'user' | 'assistant' = 'user';
-    const isAssistant = block.classList.contains('response-content') ||
-                        block.tagName.toLowerCase() === 'message-content' || 
-                        block.classList.contains('message-content') ||
-                        block.closest('message-content') !== null;
-    if (isAssistant) {
+    if (isAssistantExplicit && !isUserExplicit) {
       role = 'assistant';
     }
 
-    // Convert HTML elements recursively into clean markdown format
-    const text = elementToMarkdown(block);
+    // Clone the element and clean UI toolbar buttons (copy, thumbs up, etc.) before markdown conversion
+    const cleanBlock = block.cloneNode(true) as HTMLElement;
+    cleanBlock.querySelectorAll(
+      '.action-buttons, .response-footer, .response-actions, footer, mat-icon, google-material-icon, .tools-container, [aria-label*="Copy"], [aria-label*="Listen"], [aria-label*="Good response"], [aria-label*="Bad response"], button'
+    ).forEach(el => el.remove());
+
+    const text = elementToMarkdown(cleanBlock);
+    if (!text.trim() && cleanBlock.querySelectorAll('img').length === 0) {
+      continue;
+    }
 
     const files: AttachedFile[] = [];
 
-    // Walk up to find the broadest container that only contains this block
+    // Find broadest container for this block
     let current = block.parentElement;
     let messageContainer = block as HTMLElement;
     while (current && current !== document.body) {
@@ -220,7 +274,7 @@ export const scrapeGemini = async (): Promise<any> => {
       current = current.parentElement;
     }
 
-    // Collect images from the broadest container, including lazy-loaded and background images
+    // Collect images
     const imgSet = new Set<HTMLImageElement>();
     messageContainer.querySelectorAll('img').forEach(img => imgSet.add(img as HTMLImageElement));
     messageContainer.querySelectorAll('[style*="background-image"]').forEach(el => {
@@ -239,9 +293,9 @@ export const scrapeGemini = async (): Promise<any> => {
       const src = getImageSrc(img);
       const alt = img.getAttribute('alt') || '';
 
-      const isAvatarOrProfile = 
-        src.includes('profile') || 
-        src.includes('avatar') || 
+      const isAvatarOrProfile =
+        src.includes('profile') ||
+        src.includes('avatar') ||
         src.includes('logo') ||
         alt.toLowerCase().includes('avatar') ||
         alt.toLowerCase().includes('profile') ||
@@ -250,22 +304,12 @@ export const scrapeGemini = async (): Promise<any> => {
       if (isAvatarOrProfile) continue;
 
       if (src) {
-        // Wait for this specific image to be fully ready
-        await waitForImageReady(img, 8000);
-
+        await waitForImageReady(img, 6000);
         let base64 = await imageToBase64(img);
-        
-        // Retry 1: wait 2s for async image loading
-        if (!base64 || base64.length <= 100) {
-          await new Promise(r => setTimeout(r, 2000));
-          await waitForImageReady(img, 5000);
-          base64 = await imageToBase64(img);
-        }
 
-        // Retry 2: wait 3 more seconds (Gemini images can be slow to render)
         if (!base64 || base64.length <= 100) {
-          await new Promise(r => setTimeout(r, 3000));
-          await waitForImageReady(img, 5000);
+          await new Promise(r => setTimeout(r, 1500));
+          await waitForImageReady(img, 4000);
           base64 = await imageToBase64(img);
         }
 
@@ -280,8 +324,6 @@ export const scrapeGemini = async (): Promise<any> => {
             imageCount++;
           }
         } else if (src && !src.startsWith('data:')) {
-          // All conversion attempts failed — store the URL as a reference
-          console.warn('[MoveChat] Image conversion failed, storing URL:', src.substring(0, 100));
           files.push({
             name: alt || `gemini-image-${imageCount + 1}.png`,
             type: 'image/url',
