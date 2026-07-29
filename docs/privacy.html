@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoveChat — Privacy Policy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #fafafa;
+      padding: 2rem;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .updated { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.25rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; }
+    p { margin-bottom: 1rem; }
+    ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+    li { margin-bottom: 0.25rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e0e0e0; }
+    th { font-weight: 600; background: #f0f0f0; }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: #f0f0f0; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    strong { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p class="updated"><strong>MoveChat</strong> — Chrome Extension | Last updated: June 2026</p>
+
+    <h2>Overview</h2>
+    <p>MoveChat is a Chrome extension that captures AI chat sessions from supported platforms (ChatGPT, Claude, Gemini, Perplexity) and allows users to transfer them to other platforms.</p>
+
+    <h2>Data Collection</h2>
+    <p><strong>MoveChat does not collect any data.</strong></p>
+    <ul>
+      <li>No analytics or telemetry</li>
+      <li>No tracking of user behavior</li>
+      <li>No remote servers</li>
+      <li>No data is sent to any third party except the AI provider you explicitly configure</li>
+    </ul>
+
+    <h2>Data Storage</h2>
+    <p>All data is stored locally on your device using Chrome's <code>chrome.storage.local</code>:</p>
+    <ul>
+      <li><strong>Conversation transcripts</strong> captured from chat platforms</li>
+      <li><strong>Extension settings</strong> (theme, preferences, handoff templates)</li>
+      <li><strong>API keys</strong> for AI compression (if you choose to configure them)</li>
+    </ul>
+    <p>This data never leaves your device unless you explicitly export it or resume a conversation on another platform.</p>
+
+    <h2>API Keys</h2>
+    <p>If you enable AI compression, you provide an API key for OpenAI, Anthropic, or Google Gemini. This key:</p>
+    <ul>
+      <li>Is stored locally in <code>chrome.storage.local</code></li>
+      <li>Is sent <strong>only</strong> to the API endpoint of the provider you select</li>
+      <li>Is never transmitted to any other server</li>
+      <li>Can be deleted at any time via the extension's settings (Factory Reset)</li>
+    </ul>
+
+    <h2>Permissions</h2>
+    <table>
+      <tr><th>Permission</th><th>Purpose</th></tr>
+      <tr><td><code>activeTab</code></td><td>Capture conversations from the currently active tab</td></tr>
+      <tr><td><code>storage</code></td><td>Store conversations, settings, and API keys locally</td></tr>
+      <tr><td><code>tabs</code></td><td>Open new tabs when resuming conversations on other platforms</td></tr>
+      <tr><td><code>scripting</code></td><td>Inject content scripts into chat platform pages</td></tr>
+    </table>
+
+    <h3>Host Permissions</h3>
+    <table>
+      <tr><th>Host Pattern</th><th>Purpose</th></tr>
+      <tr><td><code>chatgpt.com</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>claude.ai</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>gemini.google.com</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>perplexity.ai</code></td><td>Content script injection and conversation capture</td></tr>
+      <tr><td><code>*.oaiusercontent.com</code></td><td>Fetch ChatGPT-generated images for PDF export</td></tr>
+      <tr><td><code>*.googleusercontent.com</code></td><td>Fetch Gemini-generated images for PDF export</td></tr>
+      <tr><td><code>*.gstatic.com</code></td><td>Fetch Google static assets for PDF export</td></tr>
+      <tr><td><code>*.google.com</code></td><td>Fetch Google image proxy content for PDF export</td></tr>
+      <tr><td><code>*.ggpht.com</code></td><td>Fetch Google Photos content for PDF export</td></tr>
+      <tr><td><code>*.anthropic.com</code></td><td>Fetch Claude-hosted images for PDF export</td></tr>
+      <tr><td><code>api.openai.com</code></td><td>AI Summary feature (OpenAI API, if configured by user)</td></tr>
+      <tr><td><code>api.anthropic.com</code></td><td>AI Summary feature (Anthropic API, if configured by user)</td></tr>
+      <tr><td><code>generativelanguage.googleapis.com</code></td><td>AI Summary feature (Gemini API, if configured by user)</td></tr>
+      <tr><td><code>images.unsplash.com</code></td><td>Fetch Unsplash images for PDF export</td></tr>
+      <tr><td><code>*.imgur.com</code></td><td>Fetch Imgur-hosted images for PDF export</td></tr>
+    </table>
+    <p>Host permissions are limited to the specific domains the extension interacts with. Images may be hosted on CDNs outside the four main platform domains, so additional image hosting domains are included to ensure conversations with images can be exported correctly. These permissions are used only for fetching images, not for accessing any other data.</p>
+
+    <h2>Third-Party Services</h2>
+    <p>MoveChat does not integrate with any third-party analytics, advertising, or tracking services.</p>
+    <p>The only external communication is between your browser and:</p>
+    <ul>
+      <li><strong>AI provider APIs</strong> — only if you configure AI Summary (e.g., <code>api.openai.com</code>, <code>api.anthropic.com</code>, <code>generativelanguage.googleapis.com</code>). This communication is initiated by you, not by the extension.</li>
+      <li><strong>Image CDN domains</strong> — when exporting conversations that contain images hosted outside the main platform (e.g., <code>oaiusercontent.com</code>, <code>googleusercontent.com</code>). These fetches are triggered during PDF/ZIP export only.</li>
+    </ul>
+
+    <h2>Open Source</h2>
+    <p>MoveChat is open source under the MIT License. You can review the full source code at <a href="https://github.com/VC067/MoveChat">github.com/VC067/MoveChat</a> to verify these claims.</p>
+
+    <h2>Contact</h2>
+    <p>For questions about this privacy policy, please open a GitHub Issue at <a href="https://github.com/VC067/MoveChat/issues">github.com/VC067/MoveChat/issues</a>.</p>
+  </div>
+</body>
+</html>
