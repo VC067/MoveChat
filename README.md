@@ -11,10 +11,12 @@
 
   <br/>
 
-  [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/cgpfngggfccdpjppachknliainihkbdg?color=4285F4&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-  [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blueviolet.svg)](public/manifest.json)
-  [![Open Source](https://img.shields.io/badge/Open%20Source-%E2%9D%A4%EF%B8%8F-brightgreen.svg)](#)
+  <p align="center">
+    <a href="https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb"><img src="https://img.shields.io/chrome-web-store/v/cgpfngggfccdpjppachknliainihkbdg?color=4285F4&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store" alt="Chrome Web Store" /></a>&nbsp;
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>&nbsp;
+    <a href="public/manifest.json"><img src="https://img.shields.io/badge/Manifest-V3-blueviolet.svg" alt="Manifest V3" /></a>&nbsp;
+    <img src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4%EF%B8%8F-brightgreen.svg" alt="Open Source" />
+  </p>
 
   <p align="center">
     <strong>Ever got stuck in a long Claude thread and wished you could instantly jump to ChatGPT, Gemini, or Perplexity without losing text, code blocks, images, or attached files?</strong><br/>
