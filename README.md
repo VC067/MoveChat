@@ -1,7 +1,5 @@
 <div align="center">
 
-  <img src="public/assets/icon128.png" alt="MoveChat Icon" width="100" style="border-radius: 20px; margin-bottom: 10px;" />
-
   # 🚀 MoveChat
   ### **Seamlessly Transfer, Export, and Resume AI Conversations Across Platforms**
 
