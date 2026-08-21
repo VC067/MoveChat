@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Session, Settings } from '../../shared/types';
-import { getSessions, saveSessions, getSettings, saveSettings } from '../../shared/storage';
+import { getSessions, saveSessions, getSettings, saveSettings, DEFAULT_SETTINGS } from '../../shared/storage';
 
 const DEFAULT_AI_SUMMARY = {
   provider: 'openai' as const,
@@ -12,11 +12,22 @@ const DEFAULT_AI_SUMMARY = {
 const migrateSettings = (raw: any): Settings => {
   // Handle migration from old aiCompression format to new aiSummary
   const aiSummary = raw.aiSummary || DEFAULT_AI_SUMMARY;
+  let handoffTemplatePdf = raw.handoffTemplatePdf || DEFAULT_SETTINGS.handoffTemplatePdf;
+  let handoffTemplateMd = raw.handoffTemplateMd || DEFAULT_SETTINGS.handoffTemplateMd;
+
+  // Auto-migrate previous default template naming conversation-history -> movechat-history if still using old default
+  if (handoffTemplateMd.includes('`conversation-history.md`')) {
+    handoffTemplateMd = handoffTemplateMd.replace('`conversation-history.md`', '`movechat-history.md`');
+  }
+  if (handoffTemplatePdf.includes('`conversation-history.pdf`')) {
+    handoffTemplatePdf = handoffTemplatePdf.replace('`conversation-history.pdf`', '`movechat-history.pdf`');
+  }
+
   return {
     theme: raw.theme || 'light',
     autoSend: !!raw.autoSend,
-    handoffTemplatePdf: raw.handoffTemplatePdf || '',
-    handoffTemplateMd: raw.handoffTemplateMd || '',
+    handoffTemplatePdf,
+    handoffTemplateMd,
     aiSummary: {
       provider: aiSummary.provider || 'openai',
       apiKey: aiSummary.apiKey || '',

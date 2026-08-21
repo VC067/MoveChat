@@ -1,10 +1,10 @@
 import type { Session, Settings } from './types';
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   theme: 'light',
   autoSend: false,
-  handoffTemplatePdf: "Continue from our previous conversation. The entire chat history is attached as `conversation-history.pdf` — every message, with uploaded files' contents inlined and the images embedded inline so you can read AND see everything. You have the complete prior context; please continue our conversation from where it left off.",
-  handoffTemplateMd: "Continue from our previous conversation. The entire chat history is attached as `conversation-history.md` along with all images and files from the original conversation. You have the complete prior context; please continue our conversation from where it left off.",
+  handoffTemplatePdf: "Continue from our previous conversation. The entire chat history is attached as `movechat-history.pdf` — every message, with uploaded files' contents inlined and the images embedded inline so you can read AND see everything. You have the complete prior context; please continue our conversation from where it left off.",
+  handoffTemplateMd: "Continue from our previous conversation. The entire chat history is attached as `movechat-history.md` along with all images and files from the original conversation. You have the complete prior context; please continue our conversation from where it left off.",
   aiSummary: {
     provider: 'openai',
     apiKey: '',

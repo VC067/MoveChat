@@ -81,7 +81,19 @@ async function buildFirefox() {
     'utf-8'
   );
 
-  console.log('[MoveChat Firefox Build] Step 4: Packaging movechat-firefox-store.zip with JSZip (POSIX forward slashes)...');
+  console.log('[MoveChat Build] Step 4: Packaging movechat-chrome-store.zip with JSZip...');
+  const chromeZip = new JSZip();
+  await addDirToZip(chromeZip, distDir);
+  const chromeBuffer = await chromeZip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 }
+  });
+  const chromeZipFile = path.join(rootDir, 'movechat-chrome-store.zip');
+  fs.writeFileSync(chromeZipFile, chromeBuffer);
+  console.log('[MoveChat Build] ✅ Created Chrome package:', chromeZipFile);
+
+  console.log('[MoveChat Firefox Build] Step 5: Packaging movechat-firefox-store.zip with JSZip (POSIX forward slashes)...');
   const zip = new JSZip();
   await addDirToZip(zip, firefoxDistDir);
 
