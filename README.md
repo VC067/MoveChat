@@ -21,7 +21,7 @@
   </p>
 
   <p align="center">
-    <strong>Ever got stuck in a long Claude thread and wished you could instantly jump to ChatGPT, Gemini, or Perplexity without losing text, code blocks, images, or attached files?</strong><br/>
+    <strong>Ever got stuck in a long Claude thread and wished you could instantly jump to ChatGPT, Gemini, Perplexity, or DeepSeek without losing text, code blocks, images, or attached files?</strong><br/>
     MoveChat is a free, 100% open-source, privacy-first Chrome extension that lets you capture, transfer, and export your AI chats in 1-click.
   </p>
 
@@ -64,6 +64,7 @@ MoveChat offers full bidirectional capture and handoff across all major AI chat 
 | **Claude** (`claude.ai`) | ✅ | ✅ | ✅ | ✅ |
 | **Gemini** (`gemini.google.com`) | ✅ | ✅ | ✅ | ✅ |
 | **Perplexity** (`perplexity.ai`) | ✅ | ✅ | ✅ | ✅ |
+| **DeepSeek** (`chat.deepseek.com`) | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
@@ -71,9 +72,9 @@ MoveChat offers full bidirectional capture and handoff across all major AI chat 
 
 ```mermaid
 graph LR
-    A[Active AI Chat<br/>Claude / ChatGPT / Gemini / Perplexity] -->|1-Click Capture| B(MoveChat Extension)
+    A[Active AI Chat<br/>Claude / ChatGPT / Gemini / Perplexity / DeepSeek] -->|1-Click Capture| B(MoveChat Extension)
     B -->|Stored Locally| C[Browser Local Storage<br/>chrome.storage.local]
-    C -->|1-Click Resume| D[Target AI Platform<br/>ChatGPT / Claude / Gemini / Perplexity]
+    C -->|1-Click Resume| D[Target AI Platform<br/>ChatGPT / Claude / Gemini / Perplexity / DeepSeek]
     C -->|Export| E[Markdown .md / PDF / JSON]
 ```
 
@@ -142,7 +143,7 @@ MoveChat/
 │   │   ├── components/         # Header, LibraryView, SessionDetailView, SettingsView, etc.
 │   │   └── hooks/              # Custom Chrome Storage Hooks
 │   ├── content/                # Content Scripts (Runs on AI web apps)
-│   │   ├── scrapers/           # ChatGPT, Claude, Gemini & Perplexity scrapers
+│   │   ├── scrapers/           # ChatGPT, Claude, Gemini, Perplexity & DeepSeek scrapers
 │   │   ├── injectors/          # Prompt & file injectors for each target platform
 │   │   ├── dom.ts              # DOM parsing & HTML-to-Markdown converter
 │   │   ├── index.ts            # Content script entry point & message listener
@@ -167,7 +168,7 @@ MoveChat is engineered with a strict **privacy-first principle**:
 
 - 🔒 **Zero Remote Analytics or Tracking**: We do not collect, track, or transmit any user data.
 - 💾 **100% On-Device Storage**: All captured sessions, images, settings, and optional API keys remain inside `chrome.storage.local`.
-- 🔐 **Scoped Host Permissions**: Host permissions are strictly restricted to supported AI web domains (`chatgpt.com`, `claude.ai`, `gemini.google.com`, `perplexity.ai`) and necessary image CDNs (`*.googleusercontent.com`, `*.oaiusercontent.com`).
+- 🔐 **Scoped Host Permissions**: Host permissions are strictly restricted to supported AI web domains (`chatgpt.com`, `claude.ai`, `gemini.google.com`, `perplexity.ai`, `chat.deepseek.com`) and necessary image CDNs (`*.googleusercontent.com`, `*.oaiusercontent.com`).
 
 | Permission | Purpose |
 | :--- | :--- |
