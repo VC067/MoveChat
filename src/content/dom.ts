@@ -13,6 +13,36 @@ export const elementToMarkdown = (element: Element): string => {
       const el = node as HTMLElement;
       const tag = el.tagName.toLowerCase();
 
+      // 1. Math formulas (KaTeX / MathJax / MathML)
+      if (el.classList.contains('katex-display') || (tag === 'mjx-container' && el.getAttribute('display') === 'true')) {
+        const annotation = el.querySelector('annotation');
+        const tex = annotation ? (annotation.textContent || '').trim() : '';
+        if (tex) {
+          md += `\n\n$$\n${tex}\n$$\n\n`;
+        } else {
+          const fallback = el.querySelector('.katex-html')?.textContent || el.textContent || '';
+          md += `\n\n$$\n${fallback.trim()}\n$$\n\n`;
+        }
+        continue;
+      }
+
+      if (el.classList.contains('katex') || tag === 'mjx-container' || tag === 'math') {
+        // If it's already inside a display math container, skip separate inline processing
+        if (el.closest('.katex-display') || (el.parentElement && el.parentElement.getAttribute('display') === 'true')) {
+          continue;
+        }
+
+        const annotation = el.querySelector('annotation');
+        const tex = annotation ? (annotation.textContent || '').trim() : '';
+        if (tex) {
+          md += ` $${tex}$ `;
+        } else {
+          const fallback = el.querySelector('.katex-html')?.textContent || el.textContent || '';
+          md += ` $${fallback.trim()}$ `;
+        }
+        continue;
+      }
+
       // Check if it's a code block container
       if (tag === 'pre') {
         const codeEl = el.querySelector('code');
@@ -36,16 +66,23 @@ export const elementToMarkdown = (element: Element): string => {
         md += ` **${elementToMarkdown(el).trim()}** `;
       } else if (tag === 'em' || tag === 'i') {
         md += ` *${elementToMarkdown(el).trim()}* `;
+      } else if (tag === 'blockquote') {
+        const inner = elementToMarkdown(el).trim();
+        md += `\n\n> ${inner.replace(/\n/g, '\n> ')}\n\n`;
       } else if (tag === 'ul') {
         md += `\n${elementToMarkdown(el)}\n`;
       } else if (tag === 'ol') {
         md += `\n${elementToMarkdown(el)}\n`;
       } else if (tag === 'li') {
         md += `\n* ${elementToMarkdown(el).trim()}`;
-      } else if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4') {
+      } else if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
         const level = tag[1];
         const hash = '#'.repeat(Number(level));
         md += `\n\n${hash} ${elementToMarkdown(el).trim()}\n\n`;
+      } else if (tag === 'a') {
+        const href = el.getAttribute('href') || '';
+        const linkText = elementToMarkdown(el).trim();
+        md += href ? ` [${linkText}](${href}) ` : ` ${linkText} `;
       } else if (el.classList.contains('code-block-container') || el.classList.contains('code-block')) {
         // Skip code block headers or wrapper metadata to prevent duplicate rendering
         const codePre = el.querySelector('pre');
@@ -60,9 +97,10 @@ export const elementToMarkdown = (element: Element): string => {
     }
   }
 
-  // Normalize multi-newlines and whitespace
+  // Normalize multi-newlines, whitespace, and spaces before punctuation
   return md
     .replace(/\n{3,}/g, '\n\n')
-    .replace(/ +/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ ([\.\,\;\:\?\!])/g, '$1')
     .trim();
 };

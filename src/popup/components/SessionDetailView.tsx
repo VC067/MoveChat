@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Play, Trash2, Check, FileText, Copy,
+  Play, Trash2, Check, FileText, FileCode, Copy,
   MessageSquare, Image, Paperclip, Archive, AlertTriangle, Loader2, Sparkles
 } from 'lucide-react';
 import JSZip from 'jszip';
@@ -445,18 +445,34 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
             Export
           </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={handleDownloadMd} className="btn-secondary">
-              <FileText className="w-4 h-4" />
-              Download as MD
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              onClick={handleDownloadMd}
+              className="flex items-center justify-center gap-2 py-3 px-3 border border-border bg-card hover:bg-secondary rounded-2xl transition-colors text-xs font-medium cursor-pointer"
+            >
+              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span>Markdown (.md)</span>
             </button>
-            <button onClick={handleDownloadPdf} className="btn-secondary">
-              <FileText className="w-4 h-4" />
-              Download as PDF
+            <button
+              onClick={handleDownloadPdf}
+              className="flex items-center justify-center gap-2 py-3 px-3 border border-border bg-card hover:bg-secondary rounded-2xl transition-colors text-xs font-medium cursor-pointer"
+            >
+              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span>PDF Document</span>
             </button>
-            <button onClick={handleDownloadJson} className="btn-secondary">
-              <FileText className="w-4 h-4" />
-              Download as JSON
+            <button
+              onClick={handleDownloadJson}
+              className="flex items-center justify-center gap-2 py-3 px-3 border border-border bg-card hover:bg-secondary rounded-2xl transition-colors text-xs font-medium cursor-pointer"
+            >
+              <FileCode className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span>JSON (.json)</span>
+            </button>
+            <button
+              onClick={handleSaveZip}
+              className="flex items-center justify-center gap-2 py-3 px-3 border border-border bg-card hover:bg-secondary rounded-2xl transition-colors text-xs font-medium cursor-pointer"
+            >
+              <Archive className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span>Full ZIP (.zip)</span>
             </button>
           </div>
         </div>
@@ -473,14 +489,6 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
               <Copy className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             )}
             <span>{copied ? 'Copied chat history!' : 'Copy chat history'}</span>
-          </button>
-
-          <button
-            onClick={handleSaveZip}
-            className="w-full flex items-center gap-3 py-3 px-4 border border-border bg-card hover:bg-secondary rounded-2xl transition-colors text-sm font-medium text-left cursor-pointer"
-          >
-            <Archive className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <span>Save as file bundle (.zip)</span>
           </button>
         </div>
 

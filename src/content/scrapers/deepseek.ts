@@ -227,43 +227,45 @@ export const scrapeDeepSeek = async (
 
     const files: AttachedFile[] = [];
 
-    let current = msgEl.parentElement;
-    let messageContainer = msgEl as HTMLElement;
-    while (current && current !== document.body) {
-      const isMessageWrapper = current.hasAttribute('data-virtual-list-item-key');
-      if (isMessageWrapper && current !== msgEl.closest('[data-virtual-list-item-key]')) break;
-      if (current.classList.contains('ds-virtual-list')) break;
-      messageContainer = current;
-      current = current.parentElement;
-    }
-
+    // Collect real conversation images from the message content node
     const imgSet = new Set<HTMLImageElement>();
-    messageContainer.querySelectorAll('img').forEach(img => {
+    (contentNode || msgEl).querySelectorAll('img').forEach(img => {
       const htmlImg = img as HTMLImageElement;
       imgSet.add(htmlImg);
     });
 
     for (const img of Array.from(imgSet)) {
       const src = img.getAttribute('src') || '';
-      const alt = img.getAttribute('alt') || '';
+      const alt = (img.getAttribute('alt') || '').trim();
 
       const isAvatarOrProfile =
         src.includes('profile') ||
         src.includes('avatar') ||
         src.includes('logo') ||
+        src.includes('user') ||
         alt.toLowerCase().includes('avatar') ||
         alt.toLowerCase().includes('profile') ||
-        img.closest('[class*="avatar"]') !== null;
+        alt.toLowerCase().includes('user') ||
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(alt) ||
+        img.closest('[class*="avatar"], [class*="user"], [class*="author"], [class*="profile"]') !== null;
 
       if (isAvatarOrProfile) continue;
+
+      // Skip small thumbnails, icons, and avatars by rendered dimensions
+      const rect = img.getBoundingClientRect();
+      if ((rect.width > 0 && rect.width <= 48) || (rect.height > 0 && rect.height <= 48) || (img.clientWidth > 0 && img.clientWidth <= 48)) {
+        continue;
+      }
 
       if (src) {
         const base64 = await imageToBase64(img);
         if (base64 && base64.length > 100) {
           const isDup = files.some(f => f.content === base64);
           if (!isDup) {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(alt);
+            const safeName = (alt && !isUuid) ? alt : `deepseek-image-${imageCount + 1}.png`;
             files.push({
-              name: alt || `deepseek-image-${imageCount + 1}.png`,
+              name: safeName,
               type: 'image/png',
               content: base64
             });
@@ -273,11 +275,12 @@ export const scrapeDeepSeek = async (
       }
     }
 
-    const filePills = messageContainer.querySelectorAll('[class*="attachment"], [class*="file-pill"], a[download]');
+    const filePills = (contentNode || msgEl).querySelectorAll('[class*="attachment"], [class*="file-pill"], a[download]');
     for (const pill of Array.from(filePills)) {
       const fileName = pill.textContent || 'attachment';
       const cleanedName = fileName.trim();
-      if (cleanedName && !files.some(f => f.name === cleanedName)) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanedName);
+      if (cleanedName && !isUuid && !files.some(f => f.name === cleanedName)) {
         files.push({
           name: cleanedName,
           type: 'application/octet-stream',

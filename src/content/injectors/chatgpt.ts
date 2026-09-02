@@ -18,6 +18,24 @@ function attachedFileToFile(attached: AttachedFile): File {
   return new File([attached.content || ''], attached.name, { type: attached.type });
 }
 
+function findChatGPTEditor(): HTMLElement | null {
+  return (
+    (document.querySelector('#prompt-textarea') as HTMLElement | null) ||
+    (document.querySelector('form div[contenteditable="true"]') as HTMLElement | null) ||
+    (document.querySelector('div[contenteditable="true"]') as HTMLElement | null) ||
+    (document.querySelector('textarea') as HTMLElement | null)
+  );
+}
+
+function findChatGPTSendButton(): HTMLButtonElement | null {
+  return (
+    (document.querySelector('[data-testid="send-button"]') as HTMLButtonElement | null) ||
+    (document.querySelector('button[aria-label*="Send prompt"]') as HTMLButtonElement | null) ||
+    (document.querySelector('button[aria-label*="Send"]') as HTMLButtonElement | null) ||
+    (document.querySelector('button[class*="send"]') as HTMLButtonElement | null)
+  );
+}
+
 export const injectChatGPT = async (pending: PendingHandoff) => {
   // Build the main export file (MD or PDF)
   let mainFile: File;
@@ -43,16 +61,42 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
 
   const interval = setInterval(() => {
     attempts++;
-    const textarea = document.querySelector('#prompt-textarea') as HTMLTextAreaElement;
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const editor = findChatGPTEditor();
 
-    if (textarea && fileInput) {
+    if (editor) {
       clearInterval(interval);
-      
-      textarea.value = handoffText;
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
-      // Attach main file + all scraped images/files
+      editor.focus();
+
+      // 1. Insert prompt text (execCommand works with ProseMirror / Lexical)
+      let inserted = false;
+      try {
+        inserted = document.execCommand('insertText', false, handoffText);
+      } catch (_) {}
+
+      // Fallback if execCommand failed or didn't set content
+      if (!inserted || !editor.textContent?.includes(handoffText.substring(0, 10))) {
+        if (editor.tagName.toLowerCase() === 'textarea') {
+          const nativeSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            'value'
+          )?.set;
+          if (nativeSetter) {
+            nativeSetter.call(editor, handoffText);
+          } else {
+            (editor as HTMLTextAreaElement).value = handoffText;
+          }
+        } else {
+          editor.innerHTML = '';
+          const p = document.createElement('p');
+          p.textContent = handoffText;
+          editor.appendChild(p);
+        }
+        editor.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        editor.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      }
+
+      // 2. Build file transfer payload
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(mainFile);
       if (pending.attachments) {
@@ -60,17 +104,47 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
           if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
-          } catch (_) {
-            // Skip files that can't be added (e.g. too large)
-          }
+          } catch (_) {}
         }
       }
-      fileInput.files = dataTransfer.files;
-      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
 
+      // 3. Attach file via <input type="file"> if present
+      let fileAttached = false;
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+      if (fileInput) {
+        try {
+          fileInput.files = dataTransfer.files;
+          fileInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+          fileAttached = true;
+        } catch (_) {}
+      }
+
+      // 4. Fallback: dispatch paste and drop events if fileInput was not present
+      if (!fileAttached) {
+        try {
+          const pasteEvent = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: dataTransfer,
+          });
+          editor.dispatchEvent(pasteEvent);
+        } catch (_) {}
+
+        try {
+          const dropTarget = editor.closest('form') || editor;
+          const dropEvent = new DragEvent('drop', {
+            bubbles: true,
+            cancelable: true,
+            dataTransfer,
+          });
+          dropTarget.dispatchEvent(dropEvent);
+        } catch (_) {}
+      }
+
+      // 5. Auto-send if enabled
       if (settings.autoSend) {
         setTimeout(() => {
-          const sendBtn = document.querySelector('[data-testid="send-button"], button[class*="send"]') as HTMLButtonElement;
+          const sendBtn = findChatGPTSendButton();
           if (sendBtn && !sendBtn.disabled) {
             sendBtn.click();
           }
@@ -80,7 +154,7 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
 
     if (attempts >= maxAttempts) {
       clearInterval(interval);
-      console.warn('[MoveChat] ChatGPT inputs not found.');
+      console.warn('[MoveChat] ChatGPT editor input not found.');
     }
   }, 1000);
 };

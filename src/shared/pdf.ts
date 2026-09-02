@@ -42,7 +42,42 @@ interface WordToken {
   isCode: boolean;
 }
 
+const sanitizeTextForPdf = (text: string): string => {
+  return text
+    // Replace LaTeX fraction macros \frac{a}{b} with (a / b)
+    .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1 / $2)')
+    // Replace \text{...} with plain text
+    .replace(/\\text\{([^{}]+)\}/g, '$1')
+    // Common LaTeX symbols
+    .replace(/\\approx/g, '~=')
+    .replace(/\\times/g, 'x')
+    .replace(/\\cdot/g, '*')
+    .replace(/\\div/g, '/')
+    .replace(/\\le(q)?\b/g, '<=')
+    .replace(/\\ge(q)?\b/g, '>=')
+    .replace(/\\neq\b/g, '!=')
+    .replace(/\\pm\b/g, '+/-')
+    // Strip display and inline dollar delimiters
+    .replace(/\$\$/g, '')
+    .replace(/\$([^\$]+)\$/g, '$1')
+    // Remove leftover backslashes on commands
+    .replace(/\\([a-zA-Z]+)/g, '$1')
+    // Replace non-ASCII characters that jsPDF Helvetica fails on
+    .replace(/≈/g, '~=')
+    .replace(/≠/g, '!=')
+    .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
+    .replace(/±/g, '+/-')
+    .replace(/×/g, 'x')
+    .replace(/÷/g, '/')
+    .replace(/—/g, '--')
+    .replace(/–/g, '-')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'");
+};
+
 const tokenizeParagraph = (text: string): TextToken[] => {
+  const sanitized = sanitizeTextForPdf(text);
   const tokens: TextToken[] = [];
   let i = 0;
   let isBold = false;
@@ -57,21 +92,21 @@ const tokenizeParagraph = (text: string): TextToken[] => {
     }
   };
 
-  while (i < text.length) {
-    if (text.startsWith('**', i) || text.startsWith('__', i)) {
+  while (i < sanitized.length) {
+    if (sanitized.startsWith('**', i) || sanitized.startsWith('__', i)) {
       flush();
       isBold = !isBold;
       i += 2;
-    } else if (text.startsWith('*', i) || text.startsWith('_', i)) {
+    } else if (sanitized.startsWith('*', i) || sanitized.startsWith('_', i)) {
       flush();
       isItalic = !isItalic;
       i += 1;
-    } else if (text.startsWith('`', i)) {
+    } else if (sanitized.startsWith('`', i)) {
       flush();
       isCode = !isCode;
       i += 1;
     } else {
-      currentText += text[i];
+      currentText += sanitized[i];
       i += 1;
     }
   }
