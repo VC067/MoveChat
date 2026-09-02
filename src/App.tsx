@@ -84,7 +84,7 @@ const App: React.FC = () => {
           const injectAndRetry = () => {
             if (chrome.scripting && activeTab.id) {
               const isSupportedUrl = activeTab.url
-                ? ['claude.ai', 'chatgpt.com', 'gemini.google.com', 'perplexity.ai'].some(
+                ?                     ['claude.ai', 'chatgpt.com', 'gemini.google.com', 'perplexity.ai', 'deepseek.com'].some(
                     domain => activeTab.url!.includes(domain)
                   )
                 : true;
@@ -143,7 +143,7 @@ const App: React.FC = () => {
             setCaptureProgress(null);
             reject(
               new Error(
-                'Unable to capture. Make sure you are on a supported AI platform (Claude, ChatGPT, Gemini, Perplexity) and the page is fully loaded.'
+                'Unable to capture. Make sure you are on a supported AI platform (Claude, ChatGPT, Gemini, Perplexity, DeepSeek) and the page is fully loaded.'
               )
             );
           };
@@ -153,7 +153,7 @@ const App: React.FC = () => {
       } else {
         // DEV MODE FALLBACK
         setTimeout(() => {
-          const platforms: Session['platform'][] = ['chatgpt', 'claude', 'gemini', 'perplexity'];
+          const platforms: Session['platform'][] = ['chatgpt', 'claude', 'gemini', 'perplexity', 'deepseek'];
           const randPlatform = platforms[Math.floor(Math.random() * platforms.length)];
           const mockSession: Session = {
             id: `session_${Date.now()}`,

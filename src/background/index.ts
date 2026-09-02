@@ -7,6 +7,7 @@ chrome.runtime.onMessage.addListener(
       if (targetPlatform === 'claude') url = 'https://claude.ai/new';
       else if (targetPlatform === 'gemini') url = 'https://gemini.google.com/app';
       else if (targetPlatform === 'perplexity') url = 'https://www.perplexity.ai/';
+      else if (targetPlatform === 'deepseek') url = 'https://chat.deepseek.com/';
 
       chrome.tabs.create({ url }, (_tab: chrome.tabs.Tab) => {
         sendResponse({ success: true });

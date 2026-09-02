@@ -6,6 +6,7 @@ const formatPlatformName = (platform: string): string => {
     case 'claude': return 'Claude';
     case 'gemini': return 'Gemini';
     case 'perplexity': return 'Perplexity';
+    case 'deepseek': return 'DeepSeek';
     default: return platform.charAt(0).toUpperCase() + platform.slice(1);
   }
 };
@@ -42,6 +43,15 @@ export const generateMarkdown = (session: Session): string => {
         });
         md += `\n`;
       }
+    }
+
+    if (msg.thinking) {
+      const thinkingLines = msg.thinking.split('\n');
+      md += `> **Thinking:**\n`;
+      thinkingLines.forEach(line => {
+        md += `> ${line}\n`;
+      });
+      md += `\n`;
     }
 
     md += `${msg.content}\n\n`;

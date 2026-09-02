@@ -23,6 +23,7 @@ const platformLabels: Record<string, string> = {
   claude: 'Claude',
   gemini: 'Gemini',
   perplexity: 'Perplexity',
+  deepseek: 'DeepSeek',
 };
 
 async function generateAiSummary(session: Session, settings: Settings): Promise<string> {
@@ -134,6 +135,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     if (hasMedia) {
       const zip = new JSZip();
       zip.file('transcript.md', generateMarkdown(session));
+      zip.file('transcript.json', JSON.stringify(session, null, 2));
       session.messages.forEach(msg => {
         if (msg.files) {
           msg.files.forEach(file => {
@@ -176,10 +178,25 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     reader.readAsDataURL(pdfBlob);
   };
 
+  const handleDownloadJson = async () => {
+    const safeTitle = session.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const json = JSON.stringify(session, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const a = document.createElement('a');
+      a.href = reader.result as string;
+      a.download = `${safeTitle}.json`;
+      a.click();
+    };
+    reader.readAsDataURL(blob);
+  };
+
   const handleSaveZip = async () => {
     const safeTitle = session.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const zip = new JSZip();
     zip.file('transcript.md', generateMarkdown(session));
+    zip.file('transcript.json', JSON.stringify(session, null, 2));
     session.messages.forEach(msg => {
       if (msg.files) {
         msg.files.forEach(file => {
@@ -340,7 +357,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
 
           {showPlatformDropdown && (
             <div className="absolute top-full mt-2 left-0 right-0 border border-border bg-card rounded-2xl shadow-lg overflow-hidden z-10">
-              {(['claude', 'chatgpt', 'gemini', 'perplexity'] as const).map(plt => (
+              {(['claude', 'chatgpt', 'gemini', 'perplexity', 'deepseek'] as const).map(plt => (
                 <button
                   key={plt}
                   onClick={() => {
@@ -436,6 +453,10 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             <button onClick={handleDownloadPdf} className="btn-secondary">
               <FileText className="w-4 h-4" />
               Download as PDF
+            </button>
+            <button onClick={handleDownloadJson} className="btn-secondary">
+              <FileText className="w-4 h-4" />
+              Download as JSON
             </button>
           </div>
         </div>

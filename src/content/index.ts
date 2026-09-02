@@ -2,19 +2,22 @@ import { scrapeChatGPT } from './scrapers/chatgpt';
 import { scrapeClaude } from './scrapers/claude';
 import { scrapeGemini } from './scrapers/gemini';
 import { scrapePerplexity } from './scrapers/perplexity';
+import { scrapeDeepSeek } from './scrapers/deepseek';
 import { injectChatGPT } from './injectors/chatgpt';
 import { injectClaude } from './injectors/claude';
 import { injectGemini } from './injectors/gemini';
 import { injectPerplexity } from './injectors/perplexity';
+import { injectDeepSeek } from './injectors/deepseek';
 import { getStorage, setStorage } from './storage';
 import type { PendingHandoff } from '../shared/types';
 
-const getPlatform = (): 'chatgpt' | 'claude' | 'gemini' | 'perplexity' | null => {
+const getPlatform = (): 'chatgpt' | 'claude' | 'gemini' | 'perplexity' | 'deepseek' | null => {
   const host = window.location.hostname;
   if (host.includes('chatgpt.com')) return 'chatgpt';
   if (host.includes('claude.ai')) return 'claude';
   if (host.includes('gemini.google.com')) return 'gemini';
   if (host.includes('perplexity.ai')) return 'perplexity';
+  if (host.includes('deepseek.com')) return 'deepseek';
   return null;
 };
 
@@ -35,6 +38,7 @@ const checkPendingHandoff = async () => {
     else if (platform === 'claude') await injectClaude(pending);
     else if (platform === 'gemini') await injectGemini(pending);
     else if (platform === 'perplexity') await injectPerplexity(pending);
+    else if (platform === 'deepseek') await injectDeepSeek(pending);
   } catch (err) {
     console.error('[MoveChat] Injection failed:', err);
   }
@@ -45,6 +49,7 @@ const runScrape = async (platform: string, onProgress?: (cur: number, total: num
   if (platform === 'claude') return await scrapeClaude();
   if (platform === 'gemini') return await scrapeGemini();
   if (platform === 'perplexity') return await scrapePerplexity();
+  if (platform === 'deepseek') return await scrapeDeepSeek(onProgress);
   throw new Error('Unsupported platform');
 };
 

@@ -101,6 +101,13 @@ const PlatformLogo: React.FC<PlatformLogoProps> = ({ platform, className = 'w-4 
           <path stroke="#20808d" strokeLinecap="round" strokeLinejoin="round" d="M24 16.573L34.27 27.01v14.407L24 31.073" />
         </svg>
       );
+    case 'deepseek':
+      return (
+        <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4D6BFE" d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4Zm0 36c-8.837 0-16-7.163-16-16S15.163 8 24 8s16 7.163 16 16-7.163 16-16 16Z" />
+          <path fill="#4D6BFE" d="M32 18c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 2.5 1.16 4.73 2.97 6.19L14 32h20l-2.97-7.81A7.98 7.98 0 0 0 32 18Zm-8 5a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z" />
+        </svg>
+      );
     default:
       return null;
   }

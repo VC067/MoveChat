@@ -30,6 +30,7 @@ const platformLabels: Record<string, string> = {
   claude: 'Claude',
   gemini: 'Gemini',
   perplexity: 'Perplexity',
+  deepseek: 'DeepSeek',
 };
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -42,7 +43,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onCapture,
   onViewAll,
 }) => {
-  const [activeTabPlatform, setActiveTabPlatform] = useState<'claude' | 'chatgpt' | 'gemini' | 'perplexity' | null>(null);
+  const [activeTabPlatform, setActiveTabPlatform] = useState<'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'deepseek' | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +59,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           else if (url.includes('claude.ai')) setActiveTabPlatform('claude');
           else if (url.includes('gemini.google.com')) setActiveTabPlatform('gemini');
           else if (url.includes('perplexity.ai')) setActiveTabPlatform('perplexity');
+          else if (url.includes('deepseek.com')) setActiveTabPlatform('deepseek');
         }
       });
     }
@@ -111,6 +113,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         const safeTitle = s.title.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
         const basePath = `${s.platform}/${safeTitle}_${s.id}`;
         zip.file(`${basePath}/transcript.md`, md);
+        zip.file(`${basePath}/transcript.json`, JSON.stringify(s, null, 2));
         s.messages.forEach(msg => {
           if (msg.files) {
             msg.files.forEach(file => {
@@ -143,6 +146,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     claude: [],
     gemini: [],
     perplexity: [],
+    deepseek: [],
   };
   sessions.forEach(s => {
     if (grouped[s.platform]) {
@@ -223,7 +227,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         ) : (
           <div className="p-4 rounded-2xl border border-dashed border-border text-center text-xs text-muted-foreground">
-            Open Claude, ChatGPT, Gemini, or Perplexity to capture an active conversation.
+            Open Claude, ChatGPT, Gemini, DeepSeek, or Perplexity to capture an active conversation.
           </div>
         )}
 

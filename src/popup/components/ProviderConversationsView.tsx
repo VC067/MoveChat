@@ -17,6 +17,7 @@ const platformLabels: Record<string, string> = {
   claude: 'Claude',
   gemini: 'Gemini',
   perplexity: 'Perplexity',
+  deepseek: 'DeepSeek',
 };
 
 export const ProviderConversationsView: React.FC<ProviderConversationsViewProps> = ({
@@ -64,6 +65,7 @@ export const ProviderConversationsView: React.FC<ProviderConversationsViewProps>
         const safeTitle = s.title.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
         const basePath = `${s.platform}/${safeTitle}_${s.id}`;
         zip.file(`${basePath}/transcript.md`, md);
+        zip.file(`${basePath}/transcript.json`, JSON.stringify(s, null, 2));
         s.messages.forEach(msg => {
           if (msg.files) {
             msg.files.forEach(file => {

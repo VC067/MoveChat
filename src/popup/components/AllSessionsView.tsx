@@ -19,6 +19,7 @@ const platformLabels: Record<string, string> = {
   claude: 'Claude',
   gemini: 'Gemini',
   perplexity: 'Perplexity',
+  deepseek: 'DeepSeek',
 };
 
 type DateFilter = 'all' | 'today' | 'week' | 'month' | 'year';
@@ -72,6 +73,7 @@ export const AllSessionsView: React.FC<AllSessionsViewProps> = ({
         const safeTitle = s.title.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
         const basePath = `${s.platform}/${safeTitle}_${s.id}`;
         zip.file(`${basePath}/transcript.md`, md);
+        zip.file(`${basePath}/transcript.json`, JSON.stringify(s, null, 2));
         s.messages.forEach(msg => {
           if (msg.files) {
             msg.files.forEach(file => {
@@ -166,7 +168,7 @@ export const AllSessionsView: React.FC<AllSessionsViewProps> = ({
             Providers
           </h3>
           <div className="flex flex-wrap gap-2">
-            {(['chatgpt', 'claude', 'gemini', 'perplexity'] as const).map(platform => {
+            {(['chatgpt', 'claude', 'gemini', 'perplexity', 'deepseek'] as const).map(platform => {
               const count = sessions.filter(s => s.platform === platform).length;
               if (count === 0) return null;
               const isActive = selectedPlatforms.includes(platform);

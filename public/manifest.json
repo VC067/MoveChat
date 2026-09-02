@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "MoveChat: Export & Transfer AI Chats (ChatGPT, Claude & Gemini)",
+  "name": "MoveChat: Export & Transfer AI Chats (ChatGPT, Claude, Gemini & DeepSeek)",
   "version": "1.1.0",
   "description": "Capture AI chat sessions and resume them in a new chat on any platform.",
   "content_security_policy": {
@@ -17,6 +17,7 @@
     "https://claude.ai/*",
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
+    "https://chat.deepseek.com/*",
     "https://*.oaiusercontent.com/*",
     "https://*.googleusercontent.com/*",
     "https://*.gstatic.com/*",
@@ -47,7 +48,8 @@
         "https://chatgpt.com/*",
         "https://claude.ai/*",
         "https://gemini.google.com/*",
-        "https://www.perplexity.ai/*"
+        "https://www.perplexity.ai/*",
+        "https://chat.deepseek.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"

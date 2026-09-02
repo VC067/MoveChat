@@ -8,6 +8,7 @@ export interface AttachedFile {
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  thinking?: string;
   timestamp?: string;
   files?: AttachedFile[];
 }
@@ -15,7 +16,7 @@ export interface Message {
 export interface Session {
   id: string;
   title: string;
-  platform: 'claude' | 'chatgpt' | 'gemini' | 'perplexity';
+  platform: 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'deepseek';
   messageCount: number;
   imageCount: number;
   fileCount: number;

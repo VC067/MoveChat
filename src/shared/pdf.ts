@@ -484,6 +484,55 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
     doc.text(msg.role === 'user' ? 'User' : 'Assistant', margin + 4, y);
     y += 8;
 
+    if (msg.thinking) {
+      y = checkPageOverflow(doc, y, 10, pageHeight, margin);
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+
+      const thinkingHeaderY = y;
+      y += 4;
+
+      const thinkingText = msg.thinking;
+      const thinkingParts = thinkingText.split('```');
+
+      for (let tIdx = 0; tIdx < thinkingParts.length; tIdx++) {
+        const tPart = thinkingParts[tIdx].trim();
+        if (!tPart) continue;
+
+        if (tIdx % 2 === 1) {
+          const tLines = tPart.split('\n');
+          let tLang = '';
+          let tCodeLines = tLines;
+          if (tLines[0] && tLines[0].trim() && !tLines[0].includes(' ') && tLines[0].trim().length < 15) {
+            tLang = tLines[0].trim();
+            tCodeLines = tLines.slice(1);
+          }
+          const tCodeText = tCodeLines.join('\n').trim();
+          if (tCodeText) {
+            y = renderCodeBlock(doc, tCodeText, tLang, margin + 2, contentWidth - 4, y, pageHeight);
+          }
+        } else {
+          y = renderTextBlock(doc, tPart, margin + 2, contentWidth - 4, y, pageHeight);
+        }
+      }
+
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, thinkingHeaderY - 2, contentWidth, y - thinkingHeaderY + 4, 1.5, 1.5, 'D');
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Thinking', margin + 4, thinkingHeaderY + 1.5);
+      y += 6;
+    }
+
     // List any attachments in this message (ignoring base64 inline images)
     if (msg.files && msg.files.length > 0) {
       const nonImageFiles = msg.files.filter(file => !(file.type.startsWith('image/') && file.content));
