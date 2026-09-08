@@ -1,6 +1,6 @@
 <div align="center">
 
-  # 🚀 MoveChat
+  # MoveChat
   ### **Seamlessly Transfer, Export, and Resume AI Conversations Across Platforms**
 
   <br/>
