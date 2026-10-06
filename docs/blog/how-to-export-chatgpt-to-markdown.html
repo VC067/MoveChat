@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to Export ChatGPT Conversations to Markdown (For Obsidian, Notion &amp; Local Notes)</title>
+  <meta name="description" content="Learn how to export ChatGPT and Claude conversations into clean Markdown files with YAML frontmatter, syntax highlighted code, and math formatting for Obsidian.">
+  <link rel="canonical" href="https://vc067.github.io/MoveChat/blog/how-to-export-chatgpt-to-markdown.html">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="MoveChat">
+  <meta property="og:title" content="How to Export ChatGPT Conversations to Markdown (For Obsidian, Notion &amp; Local Notes)">
+  <meta property="og:description" content="Step-by-step tutorial on archiving ChatGPT and Claude chats in clean Markdown with frontmatter, code blocks, and Obsidian integration.">
+  <meta property="og:url" content="https://vc067.github.io/MoveChat/blog/how-to-export-chatgpt-to-markdown.html">
+  <meta property="og:image" content="https://vc067.github.io/MoveChat/blog/assets/feature-library.webp">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="stylesheet" href="assets/blog.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "How to Export ChatGPT Conversations to Markdown (For Obsidian, Notion & Local Notes)",
+    "description": "Tutorial on exporting ChatGPT and Claude conversations into clean Markdown files with frontmatter and syntax-highlighted code.",
+    "datePublished": "2026-10-06",
+    "dateModified": "2026-10-06",
+    "author": {
+      "@type": "Person",
+      "name": "MoveChat Team"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "MoveChat",
+      "url": "https://vc067.github.io/MoveChat/"
+    },
+    "mainEntityOfPage": "https://vc067.github.io/MoveChat/blog/how-to-export-chatgpt-to-markdown.html"
+  }
+  </script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-F94MFP7515"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-F94MFP7515');
+  </script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html">
+      <img src="assets/icon.png" alt="MoveChat logo">
+      MoveChat
+    </a>
+    <nav aria-label="Main">
+      <button class="menu" aria-expanded="false" aria-label="Toggle menu">Menu</button>
+      <ul>
+        <li><a href="../index.html#features">Features</a></li>
+        <li><a href="../index.html#how-it-works">How it works</a></li>
+        <li><a href="../index.html#platforms">Platforms</a></li>
+        <li><a href="index.html" class="active">Blog</a></li>
+        <li><a class="btn primary" href="https://chromewebstore.google.com/detail/movechat-export-transfer/cgpfngggfccdpjppachknliainihkbdg">Add to Chrome</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main class="reading-wrap">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a>
+    <span class="sep">/</span>
+    <a href="index.html">Blog</a>
+    <span class="sep">/</span>
+    <span>Markdown &amp; Obsidian Guide</span>
+  </div>
+
+  <article>
+    <header class="article-header">
+      <span class="post-tag">Knowledge Management</span>
+      <h1>How to Export ChatGPT Conversations to Markdown (For Obsidian, Notion &amp; Local Notes)</h1>
+      <p class="article-lead">
+        If you rely on AI for research, coding, or writing, leaving your conversations locked inside ChatGPT's web sidebar is a recipe for lost knowledge. Here is how to export threads into clean Markdown files formatted for your local notes vault.
+      </p>
+      <div class="article-meta">
+        <div class="author-pill">
+          <img src="assets/icon.png" alt="MoveChat author">
+          <span>MoveChat Team</span>
+        </div>
+        <span>Published Oct 6, 2026</span>
+        <span>7 min read</span>
+      </div>
+    </header>
+
+    <div class="article-body">
+      <p>
+        Personal Knowledge Management (PKM) tools like Obsidian, Logseq, and Notion have transformed how developers and researchers store notes. When you solve a difficult Kubernetes bug or draft an essay outline with ChatGPT, you want that output filed in your local folder hierarchy alongside your code and daily logs.
+      </p>
+      <p>
+        Markdown is the gold standard format for this:
+      </p>
+      <ul>
+        <li><strong>Future-proof:</strong> Plaintext <code>.md</code> files will remain readable decades from now regardless of what happens to any proprietary AI web app.</li>
+        <li><strong>Fenced Code Blocks:</strong> Preserves language syntax tags, proper tab indentation, and backticks.</li>
+        <li><strong>Instant Searchability:</strong> Fast full-text grep search across thousands of saved chats on your local disk.</li>
+      </ul>
+
+      <figure>
+        <img src="assets/feature-library.webp" alt="MoveChat local library and conversation manager">
+        <figcaption>MoveChat archives conversation threads locally with clean Markdown export.</figcaption>
+      </figure>
+
+      <h2>Why OpenAI's Native Export Falls Short for Daily Notes</h2>
+      <p>
+        OpenAI allows you to export your data via <strong>Settings &rarr; Data Controls &rarr; Export Data</strong>. However, this process has significant drawbacks for note-taking:
+      </p>
+      <ol>
+        <li>It exports your <em>entire account history</em> in a single batch, not individual active chats.</li>
+        <li>It arrives as a ZIP archive containing a massive <code>conversations.json</code> file.</li>
+        <li>Inside the JSON, messages are stored in an abstract mapping tree. Reading or copying a single conversation requires writing a custom Python parsing script.</li>
+      </ol>
+      <p>
+        When you finish a productive session, you do not want an email delay and a 50 MB JSON dump. You want a single, clean <code>my-conversation.md</code> file downloaded to your desktop right away.
+      </p>
+
+      <h2>What Ideal Markdown Export Looks Like</h2>
+      <p>
+        A well-structured AI conversation export needs more than just raw text. It should include YAML frontmatter for note organization, clear headings for speaker roles, and properly fenced code blocks:
+      </p>
+
+      <pre><code>---
+title: "Configuring PostgreSQL Connection Pooling with PgBouncer"
+date: 2026-10-06
+platform: ChatGPT
+model: GPT-4o
+tags:
+  - ai-archive
+  - postgres
+  - devops
+---
+
+## User
+How do I configure connection pooling for a high-traffic Node.js API with PgBouncer?
+
+## Assistant
+Here is the recommended configuration layout for transaction pooling:
+
+```ini
+[databases]
+mydb = host=127.0.0.1 port=5432 dbname=production
+
+[pgbouncer]
+listen_port = 6432
+listen_addr = 0.0.0.0
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 1000
+default_pool_size = 20
+```</code></pre>
+
+      <h2>How to Export to Markdown in 1 Click with MoveChat</h2>
+      <p>
+        MoveChat was built to make this process immediate and frictionless.
+      </p>
+
+      <ol class="process-list">
+        <li class="process-step">
+          <h3>Open the extension on your chat</h3>
+          <p>
+            Navigate to any conversation on <code>chatgpt.com</code>, <code>claude.ai</code>, or <code>chat.deepseek.com</code>. Open MoveChat in your toolbar and click <strong>Capture this session</strong>.
+          </p>
+        </li>
+        <li class="process-step">
+          <h3>Click "Download as Markdown"</h3>
+          <p>
+            In the MoveChat popup export options, click <strong>Download as Markdown (.md)</strong>.
+          </p>
+        </li>
+        <li class="process-step">
+          <h3>Save to your Obsidian or notes directory</h3>
+          <p>
+            MoveChat generates the file instantly on your device with clean metadata, preserved headers, and code fences intact.
+          </p>
+        </li>
+      </ol>
+
+      <div class="article-cta">
+        <h3>Export AI chats to your Obsidian vault effortlessly</h3>
+        <p>Save ChatGPT, Claude, and DeepSeek threads directly as Markdown or PDF files with one click.</p>
+        <div class="actions">
+          <a class="btn primary" href="https://chromewebstore.google.com/detail/movechat-export-transfer/cgpfngggfccdpjppachknliainihkbdg">Add MoveChat to Chrome</a>
+          <a class="btn secondary" href="https://addons.mozilla.org/en-US/firefox/addon/movechat/">Firefox Add-on</a>
+        </div>
+      </div>
+
+      <h2>How to Organize AI Chats in Obsidian</h2>
+      <p>
+        Once you have your <code>.md</code> export files, here are a few best practices for maintaining an organized Obsidian vault:
+      </p>
+      <ul>
+        <li><strong>Create a dedicated folder:</strong> Set up a folder named <code>AI Archives/</code> in your vault root so raw conversations do not clutter your daily notes.</li>
+        <li><strong>Use Backlinks:</strong> In your main project note, link to the discussion using <code>[[AI Archives/2026-10-06 Postgres Pooling]]</code>.</li>
+        <li><strong>Filter with Dataview:</strong> Use the popular Obsidian Dataview plugin to generate dynamic tables of past AI sessions sorted by tag or date.</li>
+      </ul>
+
+      <h2>Frequently Asked Questions</h2>
+      <details>
+        <summary>Does MoveChat preserve LaTeX math formulas in Markdown?</summary>
+        <p>
+          Yes. Math expressions are rendered using standard dollar sign delimiters (<code>$...$</code> for inline and <code>$$...$$</code> for display equations), which Obsidian and GitHub parse natively via MathJax/KaTeX.
+        </p>
+      </details>
+      <details>
+        <summary>Can I export Claude conversations to Markdown as well?</summary>
+        <p>
+          Yes. MoveChat works across Claude, ChatGPT, Gemini, Perplexity, and DeepSeek, producing consistent Markdown formatting across all platforms.
+        </p>
+      </details>
+      <details>
+        <summary>Is any data uploaded to a third-party server during export?</summary>
+        <p>
+          No. All parsing and Markdown generation occurs locally within your browser tab. Your files are saved directly to your local file system.
+        </p>
+      </details>
+    </div>
+  </article>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>&copy; 2026 MoveChat. Open source under the MIT License.</p>
+    <ul>
+      <li><a href="https://github.com/VC067/MoveChat">GitHub</a></li>
+      <li><a href="https://chromewebstore.google.com/detail/movechat-export-transfer/cgpfngggfccdpjppachknliainihkbdg">Chrome</a></li>
+      <li><a href="https://addons.mozilla.org/en-US/firefox/addon/movechat/">Firefox</a></li>
+      <li><a href="../privacy.html">Privacy</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+  const menuBtn = document.querySelector('.menu');
+  const navList = document.querySelector('nav ul');
+  if (menuBtn && navList) {
+    menuBtn.addEventListener('click', () => {
+      const open = navList.classList.toggle('open');
+      menuBtn.setAttribute('aria-expanded', open);
+    });
+  }
+</script>
+</body>
+</html>

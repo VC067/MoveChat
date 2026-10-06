@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://vc067.github.io/MoveChat/sitemap.xml
