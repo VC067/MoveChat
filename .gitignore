@@ -7,6 +7,11 @@ dist-firefox-test/
 release-artifacts/
 .movechat-firefox-test-build
 
+# Historical root ZIPs (superseded by release-artifacts/; see RELEASING.md)
+movechat-chrome-store.zip
+movechat-firefox-store.zip
+movechat-source-code.zip
+
 # Environment
 .env
 .env.local
