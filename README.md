@@ -14,7 +14,7 @@
   <p align="center">
     <a href="public/manifest.json"><img src="https://img.shields.io/badge/Version-v1.2.1-blue.svg?logo=github" alt="Version v1.2.1" /></a>&nbsp;
     <a href="https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-v1.2.0-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Web Store" /></a>&nbsp;
-    <a href="https://addons.mozilla.org/en-US/firefox/addon/movechat/"><img src="https://img.shields.io/badge/Firefox%20Add--ons-v1.2.0-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" /></a>&nbsp;
+    <a href="https://addons.mozilla.org/en-US/firefox/addon/movechat/"><img src="https://img.shields.io/badge/Firefox%20Add--ons-v1.2.1-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" /></a>&nbsp;
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>&nbsp;
     <a href="public/manifest.json"><img src="https://img.shields.io/badge/Manifest-V3-blueviolet.svg" alt="Manifest V3" /></a>&nbsp;
     <a href="https://ko-fi.com/vedcj" target="_blank"><img src="https://img.shields.io/badge/Ko--fi-Buy%20a%20Coffee-72a4f2?logo=kofi&logoColor=white" alt="Buy a Coffee" /></a>&nbsp;
