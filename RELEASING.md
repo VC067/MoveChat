@@ -13,8 +13,8 @@ This runs tests and the production build, then creates `release-artifacts/v<vers
 
 - `movechat-chrome-v<version>.zip`: Chrome Web Store upload / unpacked developer install.
 - `movechat-firefox-v<version>.zip`: Firefox Add-ons upload / unsigned temporary testing.
-- `movechat-source-v<version>.zip`: readable sources, lockfile, jsPDF patch, tests and reviewer build instructions.
-- `SHA256SUMS.txt`, `BUILD_INFO.json`, `BUILD_INSTRUCTIONS.md`, and `RELEASE_NOTES.md`.
+- `movechat-source-v<version>.zip`: readable sources, lockfile, jsPDF patch, tests and reviewer build instructions. Kept for the Firefox Add-ons source submission; not attached to GitHub releases.
+- `SHA256SUMS.txt`, `BUILD_INFO.json`, `BUILD_INSTRUCTIONS.md`, and `RELEASE_NOTES.md`. Local release records; not attached to GitHub releases.
 
 Browser ZIPs use sorted entries and fixed timestamps. Rebuilding the same sources with the same toolchain should produce the same packages. The source archive records the commit and toolchain. Local captures, credentials, old ZIPs, and the local review report are excluded.
 
@@ -24,7 +24,7 @@ The historical `movechat-*-store.zip` files at the repository root are **not** t
 
 ## Publish on GitHub
 
-Merge the tested combined changes normally (not squash) to preserve contributor commits. Tag that merged commit as `v<version>` and upload the versioned browser/source ZIPs and checksums as release assets. GitHub tracks asset downloads; these are not browser-store installs or unique-user counts.
+Merge the tested combined changes normally (not squash) to preserve contributor commits. Tag that merged commit as `v<version>` and attach only the two versioned browser ZIPs (`movechat-chrome-v<version>.zip` and `movechat-firefox-v<version>.zip`) as release assets. The repository is public, so GitHub attaches its own tagged `Source code` archives to every release and publishes a SHA-256 digest for every uploaded asset; the source archive, checksum list and build metadata are redundant there and stay local for the Firefox source submission and verification. GitHub tracks asset downloads; these are not browser-store installs or unique-user counts.
 
 ## Update the existing store listings
 
