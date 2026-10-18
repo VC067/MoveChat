@@ -17,6 +17,7 @@
     <a href="https://addons.mozilla.org/en-US/firefox/addon/movechat/"><img src="https://img.shields.io/badge/Firefox%20Add--ons-v1.2.0-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" /></a>&nbsp;
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>&nbsp;
     <a href="public/manifest.json"><img src="https://img.shields.io/badge/Manifest-V3-blueviolet.svg" alt="Manifest V3" /></a>&nbsp;
+    <a href="https://ko-fi.com/vedcj" target="_blank"><img src="https://img.shields.io/badge/Ko--fi-Buy%20a%20Coffee-72a4f2?logo=kofi&logoColor=white" alt="Buy a Coffee" /></a>&nbsp;
     <img src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4%EF%B8%8F-brightgreen.svg" alt="Open Source" />&nbsp;
     <a href="https://github.com/VC067/MoveChat/releases"><img src="https://img.shields.io/github/downloads/VC067/MoveChat/total?label=GitHub%20downloads" alt="Total GitHub release asset downloads" /></a>
   </p>
@@ -39,6 +40,18 @@
 ## ⭐ Give Us A Star!
 
 If MoveChat helps you switch between AI platforms effortlessly, **please consider giving this repository a ⭐ star!** It helps other developers and AI users discover this open-source tool.
+
+---
+
+## ☕ Buy a Developer a Coffee
+
+Buy a developer a coffee if you found this helpful:
+
+<p align="left">
+  <a href="https://ko-fi.com/vedcj" target="_blank">
+    <img src="https://storage.ko-fi.com/cdn/kofi3.png?v=3" width="200" height="50" alt="Buy Me a Coffee" />
+  </a>
+</p>
 
 ---
 
