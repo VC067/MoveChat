@@ -3,6 +3,9 @@ node_modules/
 
 # Production build
 dist/
+dist-firefox-test/
+release-artifacts/
+.movechat-firefox-test-build
 
 # Environment
 .env

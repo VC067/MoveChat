@@ -78,7 +78,9 @@ details p{color:var(--muted);margin:.8rem 0 0;max-width:46rem}
 .post{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.5rem;text-decoration:none}
 .post time{color:var(--muted);font-size:.85rem}.post h3{margin:.4rem 0 .6rem;font-size:1.25rem}.post p{margin:0;color:var(--muted)}
 footer{border-top:1px solid var(--line);padding:2.5rem 0;color:var(--muted);font-size:.95rem}
-footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}footer ul{display:flex;gap:1.4rem;list-style:none;margin:0;padding:0}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}footer ul{display:flex;flex-wrap:wrap;gap:1.4rem;list-style:none;margin:0;padding:0}
+.support{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.5rem;padding:clamp(1.5rem,4vw,2.5rem);border:1px solid var(--line);border-radius:20px;background:var(--surface)}
+.support h2{font-size:clamp(1.4rem,3vw,1.8rem);max-width:none}.support p{max-width:42rem;margin:.7rem 0 0;color:var(--muted)}
 @media(max-width:860px){.hero .wrap,.features,.steps{grid-template-columns:1fr}.menu{display:block}
 nav ul{display:none;position:absolute;top:64px;left:0;right:0;flex-direction:column;align-items:flex-start;background:var(--bg);border-bottom:1px solid var(--line);padding:1rem 1.25rem}
 nav ul.open{display:flex}}
@@ -304,6 +306,10 @@ header.top.scrolled .bar{width:min(1040px,100% - 2rem);padding:0 .6rem 0 1rem;bo
     </a>
   </div>
 </div></section>
+<section id="support" style="padding-top:0"><div class="wrap"><div class="support">
+  <div><h2>Support the developer</h2><p>MoveChat is free and open source. If it saves you time, a coffee helps with ongoing development and maintenance. All features stay free, whether you donate or not.</p></div>
+  <a class="btn" href="https://ko-fi.com/vedcj" target="_blank" rel="noopener noreferrer">Support on Ko-fi <span aria-hidden="true">↗</span></a>
+</div></div></section>
 </main>
 
 <footer><div class="wrap">

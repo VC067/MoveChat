@@ -15,6 +15,7 @@ export const generateMarkdown = (session: Session): string => {
   let md = `# ${session.title}\n`;
   const platform = formatPlatformName(session.platform || 'unknown');
   md += `_Captured from ${platform} · ${session.messageCount} messages · ${session.imageCount} images · ${session.fileCount} files_\n`;
+  if (session.sourceUrl) md += `Source: <${session.sourceUrl}>\n`;
   md += `_Verbatim · full conversation, nothing summarized_\n\n`;
   md += `---\n\n`;
 
@@ -59,4 +60,3 @@ export const generateMarkdown = (session: Session): string => {
 
   return md.trim() + '\n';
 };
-

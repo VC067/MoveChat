@@ -326,6 +326,9 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
               {platformLabels[session.platform]} · {new Date(session.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(session.savedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
+          <p className="text-xs text-muted-foreground mt-2 break-all">
+            {session.sourceUrl ? <>Captured page: {session.sourceUrl}</> : 'Older capture — source page was not recorded.'}
+          </p>
         </div>
 
         {/* Metadata Chips */}

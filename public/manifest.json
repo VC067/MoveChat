@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MoveChat: Export & Transfer AI Chats (ChatGPT, Claude, Gemini & DeepSeek)",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Capture AI chat sessions and resume them in a new chat on any platform.",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
@@ -26,9 +26,7 @@
     "https://*.anthropic.com/*",
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",
-    "https://generativelanguage.googleapis.com/*",
-    "https://images.unsplash.com/*",
-    "https://*.imgur.com/*"
+    "https://generativelanguage.googleapis.com/*"
   ],
   "action": {
     "default_popup": "index.html",

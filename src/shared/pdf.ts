@@ -59,7 +59,7 @@ const sanitizeTextForPdf = (text: string): string => {
     .replace(/\\pm\b/g, '+/-')
     // Strip display and inline dollar delimiters
     .replace(/\$\$/g, '')
-    .replace(/\$([^\$]+)\$/g, '$1')
+    .replace(/\$([^$]+)\$/g, '$1')
     // Remove leftover backslashes on commands
     .replace(/\\([a-zA-Z]+)/g, '$1')
     // Replace non-ASCII characters that jsPDF Helvetica fails on
@@ -76,42 +76,137 @@ const sanitizeTextForPdf = (text: string): string => {
     .replace(/[‘’]/g, "'");
 };
 
+const sanitizeCodeTextForPdf = (text: string): string => {
+  // Inline code keeps its contents literally — no LaTeX/underscore rewriting —
+  // but non-ASCII glyphs are still mapped so standard PDF fonts can encode them.
+  return text
+    .replace(/≈/g, '~=')
+    .replace(/≠/g, '!=')
+    .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
+    .replace(/±/g, '+/-')
+    .replace(/×/g, 'x')
+    .replace(/÷/g, '/')
+    .replace(/—/g, '--')
+    .replace(/–/g, '-')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'");
+};
+
 const tokenizeParagraph = (text: string): TextToken[] => {
-  const sanitized = sanitizeTextForPdf(text);
   const tokens: TextToken[] = [];
-  let i = 0;
   let isBold = false;
   let isItalic = false;
-  let isCode = false;
   let currentText = '';
 
   const flush = () => {
     if (currentText) {
-      tokens.push({ text: currentText, isBold, isItalic, isCode });
+      tokens.push({ text: currentText, isBold, isItalic, isCode: false });
       currentText = '';
     }
   };
 
-  while (i < sanitized.length) {
-    if (sanitized.startsWith('**', i) || sanitized.startsWith('__', i)) {
-      flush();
-      isBold = !isBold;
-      i += 2;
-    } else if (sanitized.startsWith('*', i) || sanitized.startsWith('_', i)) {
-      flush();
-      isItalic = !isItalic;
-      i += 1;
-    } else if (sanitized.startsWith('`', i)) {
-      flush();
-      isCode = !isCode;
-      i += 1;
-    } else {
-      currentText += sanitized[i];
-      i += 1;
+  const processPlainChunk = (chunk: string): void => {
+    for (let j = 0; j < chunk.length; ) {
+      // CommonMark does not interpret underscores inside words as emphasis.
+      // Table cells and ordinary prose can contain identifiers too.
+      if (chunk[j] === '_') {
+        const length = chunk.startsWith('__', j) ? 2 : 1;
+        if (/[\p{L}\p{N}]/u.test(chunk[j - 1] || '') && /[\p{L}\p{N}]/u.test(chunk[j + length] || '')) {
+          currentText += '_'.repeat(length);
+          j += length;
+          continue;
+        }
+      }
+      if (chunk.startsWith('**', j) || chunk.startsWith('__', j)) {
+        flush();
+        isBold = !isBold;
+        j += 2;
+      } else if (chunk.startsWith('*', j) || chunk.startsWith('_', j)) {
+        flush();
+        isItalic = !isItalic;
+        j += 1;
+      } else {
+        currentText += chunk[j];
+        j += 1;
+      }
     }
+  };
+
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '`') {
+      const marker = text.slice(i).match(/^`+/)![0];
+      const runs = /`+/g;
+      runs.lastIndex = i + marker.length;
+      let closing: RegExpExecArray | null = null;
+      for (let match = runs.exec(text); match; match = runs.exec(text)) {
+        if (match[0].length === marker.length) { closing = match; break; }
+      }
+      if (!closing) {
+        // Unmatched backtick — treat the remainder as literal text.
+        processPlainChunk(sanitizeTextForPdf(text.slice(i)));
+        break;
+      }
+
+      flush();
+      let codeContent = text.slice(i + marker.length, closing.index).replace(/\n/g, ' ');
+      if (codeContent.startsWith(' ') && codeContent.endsWith(' ') && codeContent.trim()) {
+        codeContent = codeContent.slice(1, -1);
+      }
+      if (codeContent) {
+        // Inside inline code, underscore/asterisk delimiters must never toggle:
+        // identifiers like summarize_groups() keep their underscores.
+        tokens.push({ text: sanitizeCodeTextForPdf(codeContent), isBold: false, isItalic: false, isCode: true });
+      }
+      i = closing.index + marker.length;
+      continue;
+    }
+
+    const nextTick = text.indexOf('`', i);
+    processPlainChunk(sanitizeTextForPdf(text.slice(i, nextTick === -1 ? text.length : nextTick)));
+    i = nextTick === -1 ? text.length : nextTick;
   }
   flush();
   return tokens;
+};
+
+export interface FencedContentPart {
+  type: 'text' | 'code';
+  content: string;
+  lang: string;
+}
+
+export const splitFencedContent = (raw: string): FencedContentPart[] => {
+  const parts: FencedContentPart[] = [];
+  const lines = raw.replace(/\r\n?/g, '\n').split('\n');
+  let text: string[] = [];
+  const flushText = () => {
+    if (text.join('\n').trim()) parts.push({ type: 'text', content: text.join('\n'), lang: '' });
+    text = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const opening = lines[i].match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (!opening || (opening[1][0] === '`' && opening[2].includes('`'))) {
+      text.push(lines[i]);
+      continue;
+    }
+    flushText();
+    const body: string[] = [];
+    let closed = false;
+    for (i++; i < lines.length; i++) {
+      const closing = lines[i].match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/);
+      if (closing && closing[1][0] === opening[1][0] && closing[1].length >= opening[1].length) {
+        closed = true;
+        break;
+      }
+      body.push(lines[i]);
+    }
+    const content = body.join('\n') + (closed && body.length ? '\n' : '');
+    if (content.trim()) parts.push({ type: 'code', content, lang: opening[2].trim().split(/\s+/)[0] || '' });
+  }
+  flushText();
+  return parts;
 };
 
 const getWordTokens = (paragraph: string): WordToken[] => {
@@ -176,9 +271,9 @@ const renderLineWithInlineStyles = (
   const tokens = getWordTokens(text);
   
   tokens.forEach(token => {
-    let fontStyle = 'normal';
-    let fontSize = 9.5;
-    let textColor = [71, 85, 105];
+    let fontStyle: string;
+    let fontSize: number;
+    let textColor: number[];
     let fontName = 'Helvetica';
     
     if (token.isCode) {
@@ -246,6 +341,223 @@ const renderLineWithInlineStyles = (
   return y;
 };
 
+interface ParsedTable {
+  rows: string[][];
+  consumedLines: number;
+}
+
+const splitTableCells = (line: string): string[] | null => {
+  const trimmed = line.trim();
+  if (!trimmed.includes('|')) {
+    return null;
+  }
+
+  // Drop one optional leading/trailing pipe, treat `\|` as an escaped pipe.
+  const inner = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+  const cells: string[] = [];
+  let current = '';
+  let escaping = false;
+
+  for (const ch of inner) {
+    if (escaping) {
+      if (ch === '|') {
+        current += '|';
+      } else {
+        current += '\\' + ch;
+      }
+      escaping = false;
+    } else if (ch === '\\') {
+      escaping = true;
+    } else if (ch === '|') {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (escaping) {
+    current += '\\';
+  }
+  cells.push(current.trim());
+
+  return cells;
+};
+
+const isTableDelimiterRow = (cells: string[]): boolean =>
+  cells.length > 0 && cells.every((cell) => /^:?-+:?$/.test(cell));
+
+const looksLikeTable = (lines: string[]): ParsedTable | null => {
+  if (lines.length < 2) {
+    return null;
+  }
+
+  const headerCells = splitTableCells(lines[0]);
+  const delimiterCells = splitTableCells(lines[1]);
+  if (!headerCells || !delimiterCells) {
+    return null;
+  }
+  if (headerCells.length === 0 || delimiterCells.length !== headerCells.length) {
+    return null;
+  }
+  if (!isTableDelimiterRow(delimiterCells)) {
+    return null;
+  }
+  const rows: string[][] = [headerCells];
+  let consumedLines = 2;
+
+  for (let idx = 2; idx < lines.length; idx++) {
+    const cells = splitTableCells(lines[idx]);
+    if (!cells) {
+      break;
+    }
+    const normalized = cells.slice(0, headerCells.length);
+    while (normalized.length < headerCells.length) {
+      normalized.push('');
+    }
+    if (cells.length > headerCells.length) {
+      normalized[normalized.length - 1] = [normalized[normalized.length - 1], ...cells.slice(headerCells.length)]
+        .filter(Boolean)
+        .join(' | ');
+    }
+    rows.push(normalized);
+    consumedLines = idx + 1;
+  }
+
+  return { rows, consumedLines };
+};
+
+const renderTableBlock = (
+  doc: jsPDF,
+  table: ParsedTable,
+  margin: number,
+  contentWidth: number,
+  startY: number,
+  pageHeight: number
+): number => {
+  const plain = (cell: string): string => tokenizeParagraph(cell.replace(/<br\s*\/?>/gi, '\n')).map(token => token.text).join('');
+  table = { ...table, rows: table.rows.map(row => row.map(plain)) };
+  // Extremely wide tables are more readable as labelled records than tiny,
+  // overlapping columns. Keep every field instead of clipping it off the page.
+  if (table.rows[0].length > 12) {
+    let y = startY;
+    const rows = table.rows.length > 1 ? table.rows.slice(1) : [table.rows[0]];
+    for (const row of rows) {
+      for (let col = 0; col < row.length; col++) {
+        y = renderTextBlock(doc, `${table.rows[0][col] || `Column ${col + 1}`}: ${row[col]}`, margin, contentWidth, y, pageHeight);
+      }
+      y += 3;
+    }
+    return y;
+  }
+  const fontSize = 8.0;
+  const padX = 1.6;
+  const gutter = 1.8;
+  const rowGap = 4.0;
+
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(fontSize);
+
+  const colCount = table.rows[0].length;
+  const widths: number[] = [];
+
+  for (let col = 0; col < colCount; col++) {
+    let maxCellWidth = 0;
+    table.rows.forEach((row) => {
+      const cell = row[col] ?? '';
+      const cellWidth = doc.getTextWidth(cell);
+      if (cellWidth > maxCellWidth) {
+        maxCellWidth = cellWidth;
+      }
+    });
+    widths.push(Math.max(12, maxCellWidth + padX * 2));
+  }
+
+  const guttersTotal = gutter * (colCount - 1);
+  const naturalTotal = widths.reduce((sum, w) => sum + w, 0) + guttersTotal;
+
+  // Shrink columns proportionally so wide tables never overflow the page.
+  const columnWidths =
+    naturalTotal > contentWidth
+      ? widths.map((w) => (w / widths.reduce((s, v) => s + v, 0)) * (contentWidth - guttersTotal))
+      : widths;
+  const tableWidth = columnWidths.reduce((sum, w) => sum + w, 0) + guttersTotal;
+
+  const measureRow = (row: string[], isHeader = false): { lines: string[][]; height: number } => {
+    doc.setFont('Helvetica', isHeader ? 'bold' : 'normal');
+    doc.setFontSize(fontSize);
+    const cellLines = row.map((cell, col) => {
+      const wrapped: string[] = doc.splitTextToSize(cell || '', Math.max(2, columnWidths[col] - padX * 2));
+      return wrapped.length ? wrapped : [''];
+    });
+    const height = cellLines.reduce((max, lines) => Math.max(max, lines.length), 1) * rowGap;
+    return { lines: cellLines, height };
+  };
+
+  const paintRow = (row: string[], layouts: string[][], height: number, rowY: number, isHeader: boolean): void => {
+    // Row background (header shading / zebra stripes) is painted BEFORE text
+    // so a fill can never obscure cell contents.
+    doc.setFillColor(
+      isHeader ? 241 : 248,
+      isHeader ? 245 : 250,
+      isHeader ? 249 : 252
+    );
+    doc.rect(margin, rowY - 3, tableWidth, height + 1.2, 'F');
+
+    doc.setFont('Helvetica', isHeader ? 'bold' : 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(51, 65, 85); // slate-700
+
+    row.forEach((_, col) => {
+      const lines = layouts[col] ?? [''];
+      const x = margin + columnWidths.slice(0, col).reduce((sum, w) => sum + w + gutter, 0) + padX;
+      lines.forEach((lineText, lineIdx) => {
+        if (lineText) {
+          doc.text(lineText, x, rowY + lineIdx * rowGap);
+        }
+      });
+    });
+
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.setLineWidth(0.2);
+    doc.line(margin, rowY - 3 + height + 1.2, margin + tableWidth, rowY - 3 + height + 1.2);
+  };
+
+  const headerRow = table.rows[0];
+  let y = startY;
+
+  table.rows.forEach((row, rowIdx) => {
+    const isHeader = rowIdx === 0;
+    const { lines } = measureRow(row, isHeader);
+    const lineCount = lines.reduce((max, cell) => Math.max(max, cell.length), 1);
+    const nextPage = () => {
+      doc.addPage();
+      y = 20;
+      if (!isHeader) {
+        // Repeat a compact header; the original full header is never dropped.
+        const headerLines = measureRow(headerRow, true).lines.map(cell => cell.slice(0, 2));
+        const headerHeight = headerLines.reduce((max, cell) => Math.max(max, cell.length), 1) * rowGap;
+        paintRow(headerRow, headerLines, headerHeight, y, true);
+        y += headerHeight + 1.2;
+      }
+    };
+    let offset = 0;
+    while (offset < lineCount) {
+      let available = Math.floor((pageHeight - 20 - y - 1.2) / rowGap);
+      if (available < 1) {
+        nextPage();
+        available = Math.floor((pageHeight - 20 - y - 1.2) / rowGap);
+      }
+      const count = Math.min(Math.max(1, available), lineCount - offset);
+      paintRow(row, lines.map(cell => cell.slice(offset, offset + count)), count * rowGap, y, isHeader);
+      y += count * rowGap + 1.2;
+      offset += count;
+      if (offset < lineCount) nextPage();
+    }
+  });
+
+  return y + 2.5;
+};
+
 const renderTextBlock = (
   doc: jsPDF,
   textBlock: string,
@@ -263,10 +575,21 @@ const renderTextBlock = (
     if (!trimmed) return;
     
     const lines = trimmed.split('\n');
-    
-    lines.forEach((line) => {
+    let lineIdx = 0;
+
+    while (lineIdx < lines.length) {
+      const table = looksLikeTable(lines.slice(lineIdx));
+      if (table) {
+        y = renderTableBlock(doc, table, margin, contentWidth, y, pageHeight);
+        lineIdx += table.consumedLines;
+        continue;
+      }
+
+      const line = lines[lineIdx];
+      lineIdx += 1;
+
       const lineTrimmed = line.trim();
-      if (!lineTrimmed) return;
+      if (!lineTrimmed) continue;
       
       let isListItem = false;
       let indent = 0;
@@ -294,8 +617,8 @@ const renderTextBlock = (
       }
       
       if (isHeader) {
-        let fontSize = 10;
-        let lHeight = 5.0;
+        let fontSize: number;
+        let lHeight: number;
         
         if (headerLevel === 1) {
           fontSize = 14;
@@ -350,7 +673,7 @@ const renderTextBlock = (
         
         y += 5.0; // Advance by line height!
       }
-    });
+    }
     
     if (pIdx < paragraphs.length - 1) {
       y += 2.5;
@@ -359,6 +682,16 @@ const renderTextBlock = (
   
   return y;
 };
+
+interface CodeLinePosition {
+  text: string;
+  y: number;
+}
+
+type CodePlanAction =
+  | { kind: 'page' }
+  | { kind: 'langHeader'; text: string; y: number }
+  | { kind: 'segment'; startY: number; endY: number; lines: CodeLinePosition[] };
 
 const renderCodeBlock = (
   doc: jsPDF,
@@ -369,62 +702,82 @@ const renderCodeBlock = (
   startY: number,
   pageHeight: number
 ): number => {
-  let y = startY;
-  
   doc.setFont('Courier', 'normal');
   doc.setFontSize(8.0);
-  const splitCode = doc.splitTextToSize(codeText, contentWidth - 4);
-  
+  const splitCode: string[] = doc.splitTextToSize(codeText, contentWidth - 4);
+
   const lineGap = 4.2;
   const headerHeight = lang ? 5 : 0;
-  
-  let blockStartY = y - 3;
-  
+
+  // Simulate the layout first. Each page segment's background must be painted
+  // BEFORE its text lines — painting it after would blank out the code.
+  const plan: CodePlanAction[] = [];
+  let simY = startY;
+  const blockHeight = headerHeight + splitCode.length * lineGap + 3;
+  if (blockHeight <= pageHeight - 40 && simY + blockHeight > pageHeight - 20) {
+    // Keep a short example together when it fits on a fresh page.
+    plan.push({ kind: 'page' });
+    simY = 20;
+  }
+
+  if (lang) {
+    if (simY + headerHeight + 2 > pageHeight - margin) {
+      plan.push({ kind: 'page' });
+      simY = 20;
+    }
+    plan.push({ kind: 'langHeader', text: lang.toUpperCase(), y: simY });
+    simY += 4;
+  }
+
+  let segmentStartY = simY - 3;
+  let segmentLines: CodeLinePosition[] = [];
+
+  splitCode.forEach((line: string) => {
+    if (simY + lineGap > pageHeight - 20) {
+      plan.push({ kind: 'segment', startY: segmentStartY, endY: simY - 1, lines: segmentLines });
+      plan.push({ kind: 'page' });
+      simY = 20;
+      segmentStartY = simY - 3;
+      segmentLines = [];
+    }
+    segmentLines.push({ text: line, y: simY });
+    simY += lineGap;
+  });
+
+  plan.push({ kind: 'segment', startY: segmentStartY, endY: simY - 1, lines: segmentLines });
+
   const drawPageCodeBackground = (startYPos: number, endYPos: number) => {
     doc.setFillColor(248, 250, 252); // slate-50
     doc.setDrawColor(226, 232, 240); // slate-200
     doc.setLineWidth(0.3);
     doc.roundedRect(margin - 2, startYPos, contentWidth + 4, endYPos - startYPos, 1.5, 1.5, 'FD');
-    
     doc.setFillColor(148, 163, 184); // Slate-400 Left accent bar
     doc.rect(margin - 2, startYPos, 1.5, endYPos - startYPos, 'F');
   };
-  
-  if (lang) {
-    y = checkPageOverflow(doc, y, headerHeight + 2, pageHeight, margin);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139); // slate-500
-    doc.text(lang.toUpperCase(), margin, y);
-    y += 4;
-    blockStartY = y - 3;
-  }
-  
-  doc.setFont('Courier', 'normal');
-  doc.setFontSize(8.0);
-  doc.setTextColor(51, 65, 85); // slate-700
-  
-  splitCode.forEach((line: string) => {
-    if (y + lineGap > pageHeight - 20) {
-      drawPageCodeBackground(blockStartY, y - 1);
-      
+
+  plan.forEach((action) => {
+    if (action.kind === 'page') {
       doc.addPage();
-      y = 20;
-      blockStartY = y - 3;
-      
+    } else if (action.kind === 'langHeader') {
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(action.text, margin, action.y);
+    } else {
+      // Paint this page segment's background first, then write its code lines.
+      drawPageCodeBackground(action.startY, action.endY);
       doc.setFont('Courier', 'normal');
       doc.setFontSize(8.0);
-      doc.setTextColor(51, 65, 85);
+      doc.setTextColor(51, 65, 85); // slate-700
+      action.lines.forEach((line) => {
+        if (line.text) {
+          doc.text(line.text, margin + 2, line.y);
+        }
+      });
     }
-    
-    doc.text(line, margin + 2, y);
-    y += lineGap;
   });
   
-  drawPageCodeBackground(blockStartY, y - 1);
-  y += 3;
-  
-  return y;
+  return simY + 3;
 };
 
 export const generatePdf = async (session: Session): Promise<Blob> => {
@@ -474,7 +827,9 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
   y += 8;
 
   // Metadata Info Card
-  const cardHeight = 24;
+  doc.setFontSize(8.5);
+  const sourceLines: string[] = session.sourceUrl ? doc.splitTextToSize(`Source: ${session.sourceUrl}`, contentWidth - 8) : [];
+  const cardHeight = 24 + sourceLines.length * 4;
   doc.setFillColor(248, 250, 252); // slate-50 background
   doc.setDrawColor(241, 245, 249); // slate-100 border
   doc.setLineWidth(0.3);
@@ -498,6 +853,10 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
   cardY += 5;
   
   doc.text(`Stats: ${session.messageCount} messages    |    ${session.imageCount} images    |    ${session.fileCount} files`, margin + 4, cardY);
+  sourceLines.forEach(line => {
+    cardY += 4;
+    doc.text(line, margin + 4, cardY);
+  });
   
   y += cardHeight + 8;
 
@@ -521,50 +880,18 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
 
     if (msg.thinking) {
       y = checkPageOverflow(doc, y, 10, pageHeight, margin);
-      doc.setFillColor(248, 250, 252);
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.3);
-
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-
-      const thinkingHeaderY = y;
-      y += 4;
-
-      const thinkingText = msg.thinking;
-      const thinkingParts = thinkingText.split('```');
-
-      for (let tIdx = 0; tIdx < thinkingParts.length; tIdx++) {
-        const tPart = thinkingParts[tIdx].trim();
-        if (!tPart) continue;
-
-        if (tIdx % 2 === 1) {
-          const tLines = tPart.split('\n');
-          let tLang = '';
-          let tCodeLines = tLines;
-          if (tLines[0] && tLines[0].trim() && !tLines[0].includes(' ') && tLines[0].trim().length < 15) {
-            tLang = tLines[0].trim();
-            tCodeLines = tLines.slice(1);
-          }
-          const tCodeText = tCodeLines.join('\n').trim();
-          if (tCodeText) {
-            y = renderCodeBlock(doc, tCodeText, tLang, margin + 2, contentWidth - 4, y, pageHeight);
-          }
+      doc.text('Thinking', margin + 2, y);
+      y += 5;
+      for (const part of splitFencedContent(msg.thinking)) {
+        if (part.type === 'code') {
+          y = renderCodeBlock(doc, part.content, part.lang, margin + 2, contentWidth - 4, y, pageHeight);
         } else {
-          y = renderTextBlock(doc, tPart, margin + 2, contentWidth - 4, y, pageHeight);
+          y = renderTextBlock(doc, part.content, margin + 2, contentWidth - 4, y, pageHeight);
         }
       }
-
-      doc.setFillColor(248, 250, 252);
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(margin, thinkingHeaderY - 2, contentWidth, y - thinkingHeaderY + 4, 1.5, 1.5, 'D');
-
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text('Thinking', margin + 4, thinkingHeaderY + 1.5);
       y += 6;
     }
 
@@ -585,30 +912,11 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
     }
 
     // Parse message body into normal text blocks and code blocks
-    const parts = msg.content.split('```');
-    
-    parts.forEach((part, partIdx) => {
-      const isCodeBlock = partIdx % 2 === 1;
-
-      if (isCodeBlock) {
-        const lines = part.split('\n');
-        let lang = '';
-        let codeLines = lines;
-
-        if (lines[0] && lines[0].trim() && !lines[0].includes(' ') && lines[0].trim().length < 15) {
-          lang = lines[0].trim();
-          codeLines = lines.slice(1);
-        }
-
-        const codeText = codeLines.join('\n').trim();
-        if (!codeText) return;
-
-        y = renderCodeBlock(doc, codeText, lang, margin, contentWidth, y, pageHeight);
+    splitFencedContent(msg.content).forEach(part => {
+      if (part.type === 'code') {
+        y = renderCodeBlock(doc, part.content, part.lang, margin, contentWidth, y, pageHeight);
       } else {
-        const textBlock = part.trim();
-        if (!textBlock) return;
-
-        y = renderTextBlock(doc, textBlock, margin, contentWidth, y, pageHeight);
+        y = renderTextBlock(doc, part.content, margin, contentWidth, y, pageHeight);
       }
     });
 

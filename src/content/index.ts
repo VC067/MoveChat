@@ -10,6 +10,14 @@ import { injectPerplexity } from './injectors/perplexity';
 import { injectDeepSeek } from './injectors/deepseek';
 import { getStorage, setStorage } from './storage';
 import type { PendingHandoff } from '../shared/types';
+import { captureFromPage } from './capture-context';
+
+// An injection retry must replace this build's listeners, not leave multiple
+// captures racing to answer the same popup connection.
+const lifecycle = globalThis as typeof globalThis & { __movechatDisposeContent?: () => void };
+try { lifecycle.__movechatDisposeContent?.(); } catch { /* An older extension context may already be invalid. */ }
+let active = true;
+const cancelCaptures = new Set<() => void>();
 
 const getPlatform = (): 'chatgpt' | 'claude' | 'gemini' | 'perplexity' | 'deepseek' | null => {
   const host = window.location.hostname;
@@ -53,28 +61,48 @@ const runScrape = async (platform: string, onProgress?: (cur: number, total: num
   throw new Error('Unsupported platform');
 };
 
-chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
-  if (port.name !== 'movechat-scrape') return;
+const onConnect = (port: chrome.runtime.Port) => {
+  if (!active || port.name !== 'movechat-scrape') return;
+
+  let connected = true;
+  const cancel = () => { connected = false; };
+  cancelCaptures.add(cancel);
+  port.onDisconnect.addListener(cancel);
+  const post = (message: unknown) => {
+    if (!active || !connected) return;
+    try { port.postMessage(message); } catch { connected = false; }
+  };
+  const finish = () => {
+    cancelCaptures.delete(cancel);
+    port.onDisconnect.removeListener(cancel);
+  };
 
   const platform = getPlatform();
   if (!platform) {
-    port.postMessage({ type: 'error', error: 'Unsupported platform' });
+    post({ type: 'error', error: 'Unsupported platform' });
+    finish();
     return;
   }
 
-  runScrape(platform, (cur, total, step) => {
-    port.postMessage({ type: 'progress', current: cur, total, step });
-  })
-    .then(sessionData => {
-      port.postMessage({ type: 'result', session: { ...sessionData, platform } });
+  captureFromPage(() => runScrape(platform, (cur, total, step) => {
+    post({ type: 'progress', current: cur, total, step });
+  }))
+    .then(({ result: sessionData, sourceUrl, sourceTitle }) => {
+      post({ type: 'result', sourceUrl, sourceTitle, session: { ...sessionData, platform, sourceUrl } });
     })
     .catch(err => {
-      port.postMessage({ type: 'error', error: err.toString() });
-    });
-});
+      post({ type: 'error', error: err instanceof Error ? err.message : String(err) });
+    })
+    .finally(finish);
+};
+chrome.runtime.onConnect.addListener(onConnect);
 
-chrome.runtime.onMessage.addListener(
-  (request: any, _sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+const onMessage = (
+  request: { action?: string },
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response: unknown) => void
+) => {
+    if (!active) return;
     if (request.action === 'SCRAPE_SESSION') {
       const platform = getPlatform();
       if (!platform) {
@@ -82,22 +110,31 @@ chrome.runtime.onMessage.addListener(
         return true;
       }
 
-      runScrape(platform)
-        .then(sessionData => {
-          sendResponse({ session: { ...sessionData, platform } });
+      captureFromPage(() => runScrape(platform))
+        .then(({ result: sessionData, sourceUrl, sourceTitle }) => {
+          if (active) sendResponse({ sourceUrl, sourceTitle, session: { ...sessionData, platform, sourceUrl } });
         })
         .catch(err => {
-          sendResponse({ error: err.toString() });
+          if (active) sendResponse({ error: err instanceof Error ? err.message : String(err) });
         });
 
       return true; // keep channel open
     }
-  }
-);
+};
+chrome.runtime.onMessage.addListener(onMessage);
 
 // Run DOM check
+const onReady = () => { if (active) void checkPendingHandoff(); };
+lifecycle.__movechatDisposeContent = () => {
+  active = false;
+  cancelCaptures.forEach(cancel => cancel());
+  cancelCaptures.clear();
+  chrome.runtime.onConnect.removeListener(onConnect);
+  chrome.runtime.onMessage.removeListener(onMessage);
+  document.removeEventListener('DOMContentLoaded', onReady);
+};
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', checkPendingHandoff);
+  document.addEventListener('DOMContentLoaded', onReady);
 } else {
-  checkPendingHandoff();
+  onReady();
 }

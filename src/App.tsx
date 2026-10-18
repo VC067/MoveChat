@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useStorage } from './popup/hooks/useStorage';
 import { Header } from './popup/components/Header';
 import { LibraryView } from './popup/components/LibraryView';
@@ -9,6 +9,7 @@ import { DeleteConfirmation } from './popup/components/DeleteConfirmation';
 import { AllSessionsView } from './popup/components/AllSessionsView';
 import type { Session } from './shared/types';
 import { Loader2 } from 'lucide-react';
+import { captureCurrentTab } from './popup/capture';
 
 type View = 'home' | 'provider' | 'detail' | 'settings' | 'all';
 
@@ -30,129 +31,23 @@ const App: React.FC = () => {
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [lastCapturedSession, setLastCapturedSession] = useState<Session | null>(null);
   const [captureProgress, setCaptureProgress] = useState<{ current: number; total: number; step: string } | null>(null);
+  const captureInFlight = useRef<Promise<Session | null> | null>(null);
 
-  const handleCaptureCurrentTab = async (): Promise<Session | null> => {
-    setCaptureProgress({ current: 0, total: 1, step: 'Starting capture...' });
-    return new Promise((resolve, reject) => {
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
-          const activeTab = tabs[0];
-          if (!activeTab || !activeTab.id) {
-            setCaptureProgress(null);
-            reject(new Error('No active browser tab found.'));
-            return;
-          }
-
-          const connectWithInjectFallback = () => {
-            let port: chrome.runtime.Port;
-            try {
-              port = chrome.tabs.connect(activeTab.id!, { name: 'movechat-scrape' });
-            } catch {
-              // Fall through to inject
-              injectAndRetry();
-              return;
-            }
-
-            const onMsg = (msg: any) => {
-              if (msg.type === 'progress') {
-                setCaptureProgress({ current: msg.current, total: msg.total, step: msg.step });
-              } else if (msg.type === 'result') {
-                setCaptureProgress(null);
-                port.onMessage.removeListener(onMsg);
-                const newSession: Session = {
-                  ...msg.session,
-                  id: `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                };
-                addSession(newSession);
-                setLastCapturedSession(newSession);
-                resolve(newSession);
-              } else if (msg.type === 'error') {
-                setCaptureProgress(null);
-                port.onMessage.removeListener(onMsg);
-                reject(new Error(msg.error));
-              }
-            };
-
-            port.onMessage.addListener(onMsg);
-            port.onDisconnect.addListener(() => {
-              if (chrome.runtime.lastError) {
-                injectAndRetry();
-              }
-            });
-          };
-
-          const injectAndRetry = () => {
-            if (chrome.scripting && activeTab.id) {
-              const isSupportedUrl = activeTab.url
-                ?                     ['claude.ai', 'chatgpt.com', 'gemini.google.com', 'perplexity.ai', 'deepseek.com'].some(
-                    domain => activeTab.url!.includes(domain)
-                  )
-                : true;
-
-              if (isSupportedUrl) {
-                chrome.scripting.executeScript(
-                  {
-                    target: { tabId: activeTab.id },
-                    files: ['content.js'],
-                  },
-                  () => {
-                    if (chrome.runtime.lastError) {
-                      console.error('[MoveChat] Script injection failed:', chrome.runtime.lastError.message);
-                      setCaptureProgress(null);
-                      reject(new Error('Extension context updated. Please refresh this page to capture the chat.'));
-                    } else {
-                      setTimeout(() => {
-                        // After injection, try port connection again
-                        try {
-                          const retryPort = chrome.tabs.connect(activeTab.id!, { name: 'movechat-scrape' });
-                          retryPort.onMessage.addListener((msg: any) => {
-                            if (msg.type === 'progress') {
-                              setCaptureProgress({ current: msg.current, total: msg.total, step: msg.step });
-                            } else if (msg.type === 'result') {
-                              setCaptureProgress(null);
-                              const newSession: Session = {
-                                ...msg.session,
-                                id: `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                              };
-                              addSession(newSession);
-                              setLastCapturedSession(newSession);
-                              resolve(newSession);
-                            } else if (msg.type === 'error') {
-                              setCaptureProgress(null);
-                              reject(new Error(msg.error));
-                            }
-                          });
-                          retryPort.onDisconnect.addListener(() => {
-                            setCaptureProgress(null);
-                            if (chrome.runtime.lastError) {
-                              reject(new Error('Unable to capture. Please refresh the page and try again.'));
-                            }
-                          });
-                        } catch {
-                          setCaptureProgress(null);
-                          reject(new Error('Unable to capture. Please refresh the page and try again.'));
-                        }
-                      }, 300);
-                    }
-                  }
-                );
-                return;
-              }
-            }
-
-            setCaptureProgress(null);
-            reject(
-              new Error(
-                'Unable to capture. Make sure you are on a supported AI platform (Claude, ChatGPT, Gemini, Perplexity, DeepSeek) and the page is fully loaded.'
-              )
-            );
-          };
-
-          connectWithInjectFallback();
-        });
-      } else {
+  const handleCaptureCurrentTab = (): Promise<Session | null> => {
+    if (captureInFlight.current) return captureInFlight.current;
+    const runCapture = async (): Promise<Session | null> => {
+      setCaptureProgress({ current: 0, total: 1, step: 'Starting capture...' });
+      try {
+        if (typeof chrome !== 'undefined' && chrome.tabs) {
+          // The transport verifies the pinned tab, top frame and source URL
+          // before returning. Only this single path is allowed to save a result.
+          const newSession = await captureCurrentTab(setCaptureProgress);
+          await addSession(newSession);
+          setLastCapturedSession(newSession);
+          return newSession;
+        }
         // DEV MODE FALLBACK
-        setTimeout(() => {
+        await new Promise<void>(resolve => setTimeout(resolve, 1000));
           const platforms: Session['platform'][] = ['chatgpt', 'claude', 'gemini', 'perplexity', 'deepseek'];
           const randPlatform = platforms[Math.floor(Math.random() * platforms.length)];
           const mockSession: Session = {
@@ -179,12 +74,16 @@ const App: React.FC = () => {
               },
             ],
           };
-          addSession(mockSession);
+          await addSession(mockSession);
           setLastCapturedSession(mockSession);
-          resolve(mockSession);
-        }, 1000);
+          return mockSession;
+      } finally {
+        setCaptureProgress(null);
       }
-    });
+    };
+    const request = runCapture().finally(() => { captureInFlight.current = null; });
+    captureInFlight.current = request;
+    return request;
   };
 
   const handleSelectSession = (session: Session) => {

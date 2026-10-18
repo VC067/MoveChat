@@ -12,12 +12,13 @@
   <br/>
 
   <p align="center">
-    <a href="public/manifest.json"><img src="https://img.shields.io/badge/Version-v1.2.0-blue.svg?logo=github" alt="Version v1.2.0" /></a>&nbsp;
+    <a href="public/manifest.json"><img src="https://img.shields.io/badge/Version-v1.2.1-blue.svg?logo=github" alt="Version v1.2.1" /></a>&nbsp;
     <a href="https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-v1.2.0-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Web Store" /></a>&nbsp;
     <a href="https://addons.mozilla.org/en-US/firefox/addon/movechat/"><img src="https://img.shields.io/badge/Firefox%20Add--ons-v1.2.0-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" /></a>&nbsp;
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>&nbsp;
     <a href="public/manifest.json"><img src="https://img.shields.io/badge/Manifest-V3-blueviolet.svg" alt="Manifest V3" /></a>&nbsp;
-    <img src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4%EF%B8%8F-brightgreen.svg" alt="Open Source" />
+    <img src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4%EF%B8%8F-brightgreen.svg" alt="Open Source" />&nbsp;
+    <a href="https://github.com/VC067/MoveChat/releases"><img src="https://img.shields.io/github/downloads/VC067/MoveChat/total?label=GitHub%20downloads" alt="Total GitHub release asset downloads" /></a>
   </p>
 
   <p align="center">
@@ -96,6 +97,8 @@ Get MoveChat directly from the official Chrome Web Store:
 
 ### Option 2: Build & Load from Source (Developer Mode)
 
+Prebuilt extension ZIPs are available on the [GitHub Releases page](https://github.com/VC067/MoveChat/releases). Extract the Chrome ZIP and load its folder using Developer mode. GitHub Firefox ZIPs are unsigned and intended for temporary testing; use Firefox Add-ons for permanent installation. Release download counts do not include browser-store installs.
+
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/VC067/MoveChat.git
@@ -128,9 +131,17 @@ npm run dev
 # Type-check and build production bundle (outputs to /dist)
 npm run build
 
+# Run capture, Markdown, PDF, and handoff regression tests
+npm test
+
+# Build versioned Chrome/Firefox ZIPs, checksums and reviewer sources
+npm run build:release
+
 # Lint source files
 npm run lint
 ```
+
+See [RELEASING.md](RELEASING.md) for reproducible packages and store-update instructions. Store versions are published separately from GitHub releases.
 
 ---
 
@@ -192,5 +203,7 @@ Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
   ### **Enjoying MoveChat? Don't forget to ⭐ star the repository!**
 
   [Report Bug](https://github.com/VC067/MoveChat/issues) · [Request Feature](https://github.com/VC067/MoveChat/issues)
+
+  [☕ Buy the developer a coffee](https://ko-fi.com/vedcj)
 
 </div>
