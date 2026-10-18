@@ -72,7 +72,7 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
       let inserted = false;
       try {
         inserted = document.execCommand('insertText', false, handoffText);
-      } catch (_) {}
+      } catch { /* Use the editor fallback below. */ }
 
       // Fallback if execCommand failed or didn't set content
       if (!inserted || !editor.textContent?.includes(handoffText.substring(0, 10))) {
@@ -104,21 +104,22 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
           if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
-          } catch (_) {}
+          } catch { /* Skip attachments that cannot be converted. */ }
         }
       }
 
       // 3. Attach file via <input type="file"> if present
       let fileAttached = false;
       // ChatGPT has several file inputs (camera, photos, files); prefer the unrestricted "Attach files" one
-      const fileInputs = Array.from(document.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+      const fileInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+        .filter(input => !input.disabled);
       const fileInput = fileInputs.find(i => !i.accept) || fileInputs[0] || null;
       if (fileInput) {
         try {
           fileInput.files = dataTransfer.files;
           fileInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           fileAttached = true;
-        } catch (_) {}
+        } catch { /* Try the paste/drop fallbacks below. */ }
       }
 
       // 4. Fallback: dispatch paste and drop events if fileInput was not present
@@ -130,7 +131,7 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
             clipboardData: dataTransfer,
           });
           editor.dispatchEvent(pasteEvent);
-        } catch (_) {}
+        } catch { /* Some composers only accept a drop event. */ }
 
         try {
           const dropTarget = editor.closest('form') || editor;
@@ -140,7 +141,7 @@ export const injectChatGPT = async (pending: PendingHandoff) => {
             dataTransfer,
           });
           dropTarget.dispatchEvent(dropEvent);
-        } catch (_) {}
+        } catch { /* The target UI may reject synthetic drop events. */ }
       }
 
       // 5. Auto-send if enabled

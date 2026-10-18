@@ -15,6 +15,7 @@ export interface Message {
 
 export interface Session {
   id: string;
+  sourceUrl?: string; // Provenance for new captures; older saved sessions remain valid.
   title: string;
   platform: 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'deepseek';
   messageCount: number;

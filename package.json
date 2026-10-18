@@ -1,13 +1,17 @@
 {
   "name": "movechat",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:firefox": "node build-firefox.js",
+    "build:firefox:test": "npm run build && node scripts/build-firefox-test.mjs",
+    "build:release": "npm test && npm run build && node scripts/package-release.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint .",
     "preview": "vite preview",
     "postinstall": "patch-package"
@@ -31,12 +35,14 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "jsdom": "^30.1.3",
     "patch-package": "^8.0.1",
     "postcss": "^8.5.15",
     "sharp": "^0.35.2",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^6.4.3"
+    "vite": "^6.4.3",
+    "vitest": "^5.0.5"
   }
 }
