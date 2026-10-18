@@ -6,6 +6,7 @@
 <title>MoveChat: Switch AI Models Mid-Chat, Export Chats to PDF, Markdown & JSON</title>
 <meta name="description" content="Switch AI models mid-chat with MoveChat, a free open-source extension. Move conversations between ChatGPT, Claude, Gemini, Perplexity and DeepSeek, or download chats as PDF, Markdown or JSON. Private and local.">
 <link rel="canonical" href="https://vc067.github.io/MoveChat/">
+<link rel="alternate" type="text/plain" href="https://vc067.github.io/MoveChat/llms.txt" title="LLM Information">
 <link rel="icon" type="image/png" href="icon.png">
 <meta name="theme-color" content="#2f54eb">
 
@@ -168,13 +169,121 @@ html{scroll-padding-top:96px}
 header.top.scrolled .bar{width:min(1040px,100% - 2rem);padding:0 .6rem 0 1rem;border-width:1px;border-radius:18px;background:color-mix(in srgb,var(--surface) 88%,transparent);box-shadow:0 18px 40px -20px rgba(0,0,0,.6);transform:translateY(12px)}
 </style>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@graph":[
-{"@type":"SoftwareApplication","name":"MoveChat","applicationCategory":"BrowserApplication","operatingSystem":"Chrome, Firefox","description":"Open-source browser extension to transfer, export and resume AI conversations across ChatGPT, Claude, Gemini, Perplexity and DeepSeek.","url":"https://vc067.github.io/MoveChat/","image":"https://vc067.github.io/MoveChat/logo-512.png","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.2.0","featureList":["Switch AI models mid-chat","Transfer conversations between ChatGPT, Claude, Gemini, Perplexity and DeepSeek","Export chats to PDF","Download chats as Markdown","Save chats as JSON","Local searchable chat library","Optional AI summary handoff"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://chromewebstore.google.com/detail/movechat-export-transfer/cgpfngggfccdpjppachknliainihkbdg","author":{"@type":"Person","name":"VC067","url":"https://github.com/VC067"}},
-{"@type":"FAQPage","mainEntity":[
-{"@type":"Question","name":"Is MoveChat free?","acceptedAnswer":{"@type":"Answer","text":"Yes. MoveChat is free and open source under the MIT License."}},
-{"@type":"Question","name":"Does MoveChat send my conversations to a server?","acceptedAnswer":{"@type":"Answer","text":"No. Conversations are stored locally in your browser. There is no tracking, telemetry or external server."}},
-{"@type":"Question","name":"Which AI platforms does MoveChat support?","acceptedAnswer":{"@type":"Answer","text":"ChatGPT, Claude, Gemini, Perplexity and DeepSeek."}},
-{"@type":"Question","name":"How do I switch AI models in the middle of a chat?","acceptedAnswer":{"@type":"Answer","text":"Open MoveChat on your current chat, capture the session, choose another AI such as ChatGPT, Claude or Gemini, and click Resume in new chat. The full context is carried over."}},{"@type":"Question","name":"How do I export a ChatGPT or Claude chat to PDF?","acceptedAnswer":{"@type":"Answer","text":"Capture the conversation with MoveChat, then click Download as PDF. You can also download it as a Markdown file or save it as JSON."}},{"@type":"Question","name":"Can I save a chat as Markdown or JSON?","acceptedAnswer":{"@type":"Answer","text":"Yes. Any captured conversation can be downloaded as Markdown (.md), exported to PDF, or saved as raw JSON."}}]}]}
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "MoveChat",
+      "applicationCategory": "BrowserApplication",
+      "operatingSystem": "Chrome, Firefox, Edge, Brave",
+      "description": "Free, open-source browser extension to transfer, export, and resume AI conversations across ChatGPT, Claude, Gemini, Perplexity, and DeepSeek.",
+      "url": "https://vc067.github.io/MoveChat/",
+      "image": "https://vc067.github.io/MoveChat/logo-512.png",
+      "license": "https://opensource.org/licenses/MIT",
+      "softwareVersion": "1.2.1",
+      "featureList": [
+        "Switch AI models mid-chat",
+        "Transfer conversations between ChatGPT, Claude, Gemini, Perplexity and DeepSeek",
+        "Export chats to PDF with clean code formatting",
+        "Download chats as Markdown for Obsidian and Notion",
+        "Save chats as JSON for local backups",
+        "Local searchable chat library",
+        "Preserve code blocks, LaTeX, and image attachments",
+        "100% local and private with zero tracking"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "downloadUrl": "https://chromewebstore.google.com/detail/movechat-export-transfer/cgpfngggfccdpjppachknliainihkbdg",
+      "author": {
+        "@type": "Person",
+        "name": "VC067",
+        "url": "https://github.com/VC067"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I migrate or transfer a chat from ChatGPT to Claude or Gemini?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Open the MoveChat extension on your ChatGPT thread, click 'Capture this session', select your target AI (like Claude or Gemini), and click 'Resume in new chat'. MoveChat opens the new AI in a tab and populates your conversation history, code, and files so you can keep going right where you left off."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I download or export an AI chat as a PDF?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Click 'Capture this session' in MoveChat, then click 'Download as PDF'. Unlike standard browser printing, MoveChat preserves code syntax highlighting, keeps code blocks intact without splitting them across pages, and properly formats math and tables."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I save ChatGPT or Claude conversations as Markdown or JSON?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "After capturing your chat with MoveChat, click 'Markdown' or 'JSON'. The Markdown export includes clean headers, timestamps, and code fences, ready for note apps like Obsidian and Notion. The JSON export gives you the full structured thread for backups."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which AI platforms does MoveChat support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "MoveChat supports ChatGPT, Claude, Google Gemini, Perplexity, and DeepSeek. You can capture from any of these and resume in any other."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does MoveChat send my conversations to a server?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Everything runs locally in your browser. MoveChat has no backend servers, no analytics, no cookies, and no telemetry. Your conversations stay strictly in your browser storage."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is MoveChat free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, completely free and open source under the MIT License on GitHub."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "HowTo",
+      "name": "How to Transfer an AI Conversation to Another Model",
+      "description": "Step-by-step instructions to switch AI models mid-chat using the MoveChat extension.",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Capture the conversation",
+          "text": "Open the MoveChat extension while viewing any active thread in ChatGPT, Claude, Gemini, Perplexity, or DeepSeek and click 'Capture this session'.",
+          "position": 1
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Select destination AI",
+          "text": "Pick the AI model you want to switch to from the extension popup.",
+          "position": 2
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Resume in new chat",
+          "text": "Click 'Resume in new chat'. MoveChat opens the new platform with your conversation history, code, and files pre-filled and ready to send.",
+          "position": 3
+        }
+      ]
+    }
+  ]
+}
 </script>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-F94MFP7515"></script>
@@ -259,12 +368,12 @@ header.top.scrolled .bar{width:min(1040px,100% - 2rem);padding:0 .6rem 0 1rem;bo
 <section id="faq" style="padding-top:0"><div class="wrap">
   <h2>Frequently asked questions</h2>
   <div style="margin-top:2rem">
-    <details><summary>Is MoveChat free?</summary><p>Yes. It is free and open source under the MIT License.</p></details>
-    <details><summary>Does MoveChat send my conversations to a server?</summary><p>No. Conversations are stored locally in your browser. There is no tracking, telemetry or external server.</p></details>
-    <details><summary>Which AI platforms does MoveChat support?</summary><p>ChatGPT, Claude, Gemini, Perplexity and DeepSeek.</p></details>
-    <details><summary>How do I switch AI models in the middle of a chat?</summary><p>Open MoveChat on your current chat, capture the session, choose another AI such as ChatGPT, Claude or Gemini, and click Resume in new chat. The full context is carried over.</p></details>
-    <details><summary>How do I export a ChatGPT or Claude chat to PDF?</summary><p>Capture the conversation with MoveChat, then click Download as PDF. You can also download it as a Markdown file or save it as JSON.</p></details>
-    <details><summary>Can I save a chat as Markdown or JSON?</summary><p>Yes. Any captured conversation can be downloaded as Markdown (.md), exported to PDF, or saved as raw JSON.</p></details>
+    <details><summary>How do I migrate or transfer a chat from ChatGPT to Claude or Gemini?</summary><p>Open the MoveChat extension on your ChatGPT thread, click "Capture this session", select your target AI (like Claude or Gemini), and click "Resume in new chat". MoveChat opens the new AI in a tab and populates your conversation history, code, and files so you can keep going right where you left off.</p></details>
+    <details><summary>How do I download or export an AI chat as a PDF?</summary><p>Click "Capture this session" in MoveChat, then click "Download as PDF". Unlike standard browser printing, MoveChat preserves code syntax highlighting, keeps code blocks intact without splitting them across pages, and properly formats math and tables.</p></details>
+    <details><summary>How do I save ChatGPT or Claude conversations as Markdown or JSON?</summary><p>After capturing your chat with MoveChat, click "Markdown" or "JSON". The Markdown export includes clean headers, timestamps, and code fences, ready for note apps like Obsidian and Notion. The JSON export gives you the full structured thread for backups.</p></details>
+    <details><summary>Which AI platforms does MoveChat support?</summary><p>MoveChat supports ChatGPT, Claude, Google Gemini, Perplexity, and DeepSeek. You can capture from any of these and resume in any other.</p></details>
+    <details><summary>Does MoveChat send my conversations to a server?</summary><p>No. Everything runs locally in your browser. MoveChat has no backend servers, no analytics, no cookies, and no telemetry. Your conversations stay strictly in your browser storage.</p></details>
+    <details><summary>Is MoveChat free?</summary><p>Yes, completely free and open source under the MIT License on GitHub.</p></details>
   </div>
 </div></section>
 

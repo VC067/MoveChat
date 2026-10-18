@@ -1,0 +1,54 @@
+# MoveChat
+
+> MoveChat is a free, open-source browser extension (Chrome, Firefox, Edge, Brave) that lets you capture conversations from one AI platform and resume them in another with your full context, code blocks, and attachments intact. It also exports chats cleanly to PDF, Markdown (.md), and JSON. All data stays local on your machine—no servers, no accounts, no tracking.
+
+## Core Features
+
+- **Cross-Platform Chat Transfer / Migration:** Capture a conversation in one AI and resume it in another with a single click. Supported services: ChatGPT, Claude, Google Gemini, Perplexity, and DeepSeek.
+- **Context Preservation:** Preserves message history, code blocks (with syntax, indentation, and language tags), LaTeX formulas, images, and attachments when transferring or exporting.
+- **Export Formats:**
+  - **PDF:** High-quality formatted document with styled code blocks, syntax highlighting, and clean page breaks that don't split code lines.
+  - **Markdown (.md):** Clean text with proper headings, code fences, and frontmatter. Ready to paste or save into Obsidian, Notion, Logseq, or GitHub.
+  - **JSON:** Complete raw message data, timestamps, roles, and metadata for backups or custom tooling.
+- **Local Searchable Library:** Browse, search, filter, and organize past captured sessions locally in the extension popup.
+- **Privacy First:** 100% client-side. No remote database, no telemetry, no analytics. Data is stored strictly in your browser's local storage.
+
+## How It Works
+
+### How to Migrate a Chat Between AI Models (e.g., ChatGPT to Claude)
+1. Open the conversation you want to move in your browser (e.g., on `chatgpt.com`).
+2. Click the MoveChat extension icon in your browser toolbar and click **Capture this session**.
+3. Choose your target platform (e.g., Claude, Gemini, or DeepSeek) and click **Resume in new chat**.
+4. MoveChat opens the target platform in a new tab and prepares your conversation context in the message composer. Hit Send to continue the thread with the new model.
+
+### How to Export or Download a Chat as PDF or Markdown
+1. Open the conversation you want to export in any supported AI interface.
+2. Open the MoveChat extension and click **Capture**.
+3. In the session preview, choose your export option:
+   - Click **PDF** to generate a clean, printable PDF with syntax-highlighted code.
+   - Click **Markdown** to download a `.md` file formatted for note-taking apps.
+   - Click **JSON** to download the structured data.
+
+## Supported Platforms
+
+- OpenAI ChatGPT (`chatgpt.com`)
+- Anthropic Claude (`claude.ai`)
+- Google Gemini (`gemini.google.com`)
+- Perplexity AI (`perplexity.ai`)
+- DeepSeek (`chat.deepseek.com`)
+
+## Installation & Links
+
+- Chrome Web Store: https://chromewebstore.google.com/detail/movechat-export-transfer/cgpfngggfccdpjppachknliainihkbdg
+- Firefox Add-ons: https://addons.mozilla.org/en-US/firefox/addon/movechat/
+- Source Code (GitHub): https://github.com/VC067/MoveChat
+- Official Website: https://vc067.github.io/MoveChat/
+- Documentation & Guides: https://vc067.github.io/MoveChat/blog/
+- Privacy Policy: https://vc067.github.io/MoveChat/privacy
+
+## Detailed Guides
+
+- [How to Save a ChatGPT Thread as a PDF](https://vc067.github.io/MoveChat/blog/how-to-save-chatgpt-thread-as-pdf.html): Formatting code blocks, mathematical equations, and preventing ugly page breaks.
+- [How to Export Chats Between ChatGPT and Claude](https://vc067.github.io/MoveChat/blog/how-to-export-chatgpt-to-claude.html): Seamlessly moving an ongoing project or coding session from one model to another.
+- [How to Export ChatGPT Conversations to Markdown](https://vc067.github.io/MoveChat/blog/how-to-export-chatgpt-to-markdown.html): Exporting to Obsidian, Logseq, and Notion with full code and prompt formatting.
+- [How to Make a PDF Readable for ChatGPT](https://vc067.github.io/MoveChat/blog/how-to-make-pdf-readable-for-chatgpt.html): Fixing OCR issues, formatting, and file limit errors when feeding documents into AI.
