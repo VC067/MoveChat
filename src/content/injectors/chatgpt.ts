@@ -36,128 +36,168 @@ function findChatGPTSendButton(): HTMLButtonElement | null {
   );
 }
 
-export const injectChatGPT = async (pending: PendingHandoff) => {
-  // Build the main export file (MD or PDF)
-  let mainFile: File;
-  if (pending.mimeType === 'text/markdown') {
-    mainFile = new File([pending.fileContent], pending.fileName, { type: pending.mimeType });
-  } else {
-    const base64Data = pending.fileContent.split(',')[1] || pending.fileContent;
-    const byteCharacters = atob(base64Data);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: pending.mimeType });
-    mainFile = new File([blob], pending.fileName, { type: pending.mimeType });
-  }
+function findChatGPTFileInput(): HTMLInputElement | null {
+  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
+    .filter(i => !i.disabled);
+  const isImageOrCamera = (i: HTMLInputElement): boolean => {
+    const accept = (i.getAttribute('accept') || '').toLowerCase();
+    return i.hasAttribute('capture') || accept.includes('image') || accept.includes('video') || accept.includes('camera');
+  };
+  return (
+    inputs.find(i => !i.getAttribute('accept') && !i.hasAttribute('capture')) ||
+    inputs.find(i => !isImageOrCamera(i)) ||
+    inputs[0] ||
+    null
+  );
+}
 
+function buildMainFile(pending: PendingHandoff): File {
+  if (pending.mimeType === 'text/markdown') {
+    return new File([pending.fileContent], pending.fileName, { type: pending.mimeType });
+  }
+  const base64Data = pending.fileContent.split(',')[1] || pending.fileContent;
+  const byteCharacters = atob(base64Data);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: pending.mimeType });
+  return new File([blob], pending.fileName, { type: pending.mimeType });
+}
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export const injectChatGPT = async (pending: PendingHandoff) => {
+  const mainFile = buildMainFile(pending);
   const settings = await getStorage<Settings>('settings', {} as Settings);
   const handoffText = pending.handoffText;
 
-  const maxAttempts = 30;
-  let attempts = 0;
+  const attachmentNames = [
+    mainFile.name,
+    ...(pending.attachments || []).map(a => a.name).filter(n => n !== 'debug_log.txt'),
+  ];
 
-  const interval = setInterval(() => {
-    attempts++;
+  const dataTransfer = new DataTransfer();
+  dataTransfer.items.add(mainFile);
+  for (const att of pending.attachments || []) {
+    if (att.name === 'debug_log.txt') continue;
+    try {
+      dataTransfer.items.add(attachedFileToFile(att));
+    } catch { /* Skip attachments that cannot be converted. */ }
+  }
+
+  const textPresent = (): boolean => {
     const editor = findChatGPTEditor();
+    return !!editor && !!editor.textContent && editor.textContent.includes(handoffText.substring(0, 10));
+  };
 
-    if (editor) {
-      clearInterval(interval);
+  const chipsPresent = (): boolean => {
+    const leaves = document.querySelectorAll('span, div, a');
+    for (const el of Array.from(leaves)) {
+      if (el.children.length !== 0) continue;
+      if (el.closest('[contenteditable="true"], textarea')) continue;
+      const t = (el.textContent || '').trim();
+      if (t && attachmentNames.some(n => t === n || t.includes(n))) return true;
+    }
+    return false;
+  };
 
-      editor.focus();
+  const insertText = (editor: HTMLElement): void => {
+    if (editor.textContent?.includes(handoffText.substring(0, 10))) return;
+    editor.focus();
+    let inserted = false;
+    try {
+      inserted = document.execCommand('insertText', false, handoffText);
+    } catch { /* Use the editor fallback below. */ }
 
-      // 1. Insert prompt text (execCommand works with ProseMirror / Lexical)
-      let inserted = false;
-      try {
-        inserted = document.execCommand('insertText', false, handoffText);
-      } catch { /* Use the editor fallback below. */ }
-
-      // Fallback if execCommand failed or didn't set content
-      if (!inserted || !editor.textContent?.includes(handoffText.substring(0, 10))) {
-        if (editor.tagName.toLowerCase() === 'textarea') {
-          const nativeSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLTextAreaElement.prototype,
-            'value'
-          )?.set;
-          if (nativeSetter) {
-            nativeSetter.call(editor, handoffText);
-          } else {
-            (editor as HTMLTextAreaElement).value = handoffText;
-          }
+    if (!inserted || !editor.textContent?.includes(handoffText.substring(0, 10))) {
+      if (editor.tagName.toLowerCase() === 'textarea') {
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLTextAreaElement.prototype,
+          'value'
+        )?.set;
+        if (nativeSetter) {
+          nativeSetter.call(editor, handoffText);
         } else {
-          editor.innerHTML = '';
-          const p = document.createElement('p');
-          p.textContent = handoffText;
-          editor.appendChild(p);
+          (editor as HTMLTextAreaElement).value = handoffText;
         }
-        editor.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-        editor.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      } else {
+        editor.innerHTML = '';
+        const p = document.createElement('p');
+        p.textContent = handoffText;
+        editor.appendChild(p);
+      }
+      editor.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      editor.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    }
+  };
+
+  const attachViaInput = (): void => {
+    const fileInput = findChatGPTFileInput();
+    if (!fileInput) return;
+    try {
+      fileInput.files = dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    } catch { /* Try the paste/drop fallbacks below. */ }
+  };
+
+  const attachViaPaste = (editor: HTMLElement): void => {
+    try {
+      const pasteEvent = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dataTransfer,
+      });
+      editor.dispatchEvent(pasteEvent);
+    } catch { /* Some composers only accept a drop event. */ }
+  };
+
+  const attachViaDrop = (editor: HTMLElement): void => {
+    try {
+      const dropTarget = editor.closest('form') || editor;
+      const dropEvent = new DragEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer,
+      });
+      dropTarget.dispatchEvent(dropEvent);
+    } catch { /* The target UI may reject synthetic drop events. */ }
+  };
+
+  const maxAttempts = 30;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const editor = findChatGPTEditor();
+    if (editor) {
+      insertText(editor);
+
+      if (!chipsPresent()) {
+        attachViaInput();
+        await wait(400);
+      }
+      if (!chipsPresent()) {
+        attachViaPaste(editor);
+        await wait(400);
+      }
+      if (!chipsPresent()) {
+        attachViaDrop(editor);
+        await wait(400);
       }
 
-      // 2. Build file transfer payload
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mainFile);
-      if (pending.attachments) {
-        for (const att of pending.attachments) {
-          if (att.name === 'debug_log.txt') continue;
-          try {
-            dataTransfer.items.add(attachedFileToFile(att));
-          } catch { /* Skip attachments that cannot be converted. */ }
-        }
-      }
-
-      // 3. Attach file via <input type="file"> if present
-      let fileAttached = false;
-      // ChatGPT has several file inputs (camera, photos, files); prefer the unrestricted "Attach files" one
-      const fileInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
-        .filter(input => !input.disabled);
-      const fileInput = fileInputs.find(i => !i.accept) || fileInputs[0] || null;
-      if (fileInput) {
-        try {
-          fileInput.files = dataTransfer.files;
-          fileInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-          fileAttached = true;
-        } catch { /* Try the paste/drop fallbacks below. */ }
-      }
-
-      // 4. Fallback: dispatch paste and drop events if fileInput was not present
-      if (!fileAttached) {
-        try {
-          const pasteEvent = new ClipboardEvent('paste', {
-            bubbles: true,
-            cancelable: true,
-            clipboardData: dataTransfer,
-          });
-          editor.dispatchEvent(pasteEvent);
-        } catch { /* Some composers only accept a drop event. */ }
-
-        try {
-          const dropTarget = editor.closest('form') || editor;
-          const dropEvent = new DragEvent('drop', {
-            bubbles: true,
-            cancelable: true,
-            dataTransfer,
-          });
-          dropTarget.dispatchEvent(dropEvent);
-        } catch { /* The target UI may reject synthetic drop events. */ }
-      }
-
-      // 5. Auto-send if enabled
-      if (settings.autoSend) {
-        setTimeout(() => {
+      if (textPresent() && chipsPresent()) {
+        if (settings.autoSend) {
+          await wait(500);
           const sendBtn = findChatGPTSendButton();
           if (sendBtn && !sendBtn.disabled) {
             sendBtn.click();
           }
-        }, 1500);
+        }
+        return;
       }
     }
+    await wait(1000);
+  }
 
-    if (attempts >= maxAttempts) {
-      clearInterval(interval);
-      console.warn('[MoveChat] ChatGPT editor input not found.');
-    }
-  }, 1000);
+  console.warn('[MoveChat] ChatGPT injection could not be completed.');
 };
