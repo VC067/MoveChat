@@ -1,5 +1,6 @@
 import type { Message, AttachedFile, Session } from '../../shared/types';
 import { elementToMarkdown } from '../dom';
+import { readChatGPTHistory } from './chatgpt-history';
 
 // Wait for an image element to complete loading
 function waitForImageLoad(img: HTMLImageElement, timeoutMs = 5000): Promise<void> {
@@ -21,38 +22,50 @@ function waitForImageLoad(img: HTMLImageElement, timeoutMs = 5000): Promise<void
   });
 }
 
-async function fetchWithTimeout(url: string, ms = 5000): Promise<Response> {
+async function fetchImageBlob(url: string, ms = 5000): Promise<Blob | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
-    const resp = await fetch(url, { signal: controller.signal, credentials: 'include' });
-    return resp;
+    const response = await fetch(url, { signal: controller.signal, credentials: 'include' });
+    return response.ok ? await response.blob() : null;
   } finally {
     clearTimeout(timer);
   }
 }
 
 // Convert an image to base64 using Canvas first, then background CORS proxy
-const getImageSource = (img: HTMLImageElement): string =>
-  img.currentSrc || img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original') || '';
+const imageData = (value: unknown): value is `data:image/${string};base64,${string}` =>
+  typeof value === 'string' && /^data:image\/[^;,]+;base64,.+/.test(value);
 
-async function imageToBase64(img: HTMLImageElement): Promise<string> {
-  const src = getImageSource(img);
+function getImageSource(img: HTMLImageElement): string {
+  const fromSet = (value: string | null | undefined) => value?.trim().split(/\s+/)[0]?.replace(/,$/, '');
+  const sources = [
+    img.currentSrc,
+    img.getAttribute('src'),
+    img.getAttribute('data-src'),
+    img.getAttribute('data-original'),
+    img.getAttribute('data-lazy-src'),
+    fromSet(img.getAttribute('srcset') || img.getAttribute('data-srcset')),
+    fromSet(img.closest('picture')?.querySelector('source[srcset]')?.getAttribute('srcset')),
+  ].filter((src): src is string => !!src && src !== 'data:,');
+  const src = sources.find(value => !/^data:image\/(?:svg\+xml|gif)[;,]/i.test(value)) || sources[0];
   if (!src) return '';
-
-  // Already base64
-  if (src.startsWith('data:')) return src;
-
-  // Skip tiny images (avatars/icons are typically <48px)
-  if (img.naturalWidth > 0 && img.naturalHeight > 0 && img.naturalWidth < 48 && img.naturalHeight < 48) {
+  try {
+    return new URL(src, img.baseURI).href;
+  } catch {
     return '';
   }
+}
 
-  // Wait until the image is loaded
+async function imageToBase64(img: HTMLImageElement, source: string): Promise<string> {
+  if (imageData(source)) return source;
+
   await waitForImageLoad(img);
+  const src = getImageSource(img) || source;
+  if (imageData(src)) return src;
 
   // 1. Try canvas (works for same-origin)
-  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+  if (img.currentSrc === src && img.naturalWidth > 0 && img.naturalHeight > 0) {
     try {
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth;
@@ -61,9 +74,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
       if (ctx) {
         ctx.drawImage(img, 0, 0);
         const dataUrl = canvas.toDataURL('image/png');
-        if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
-          return dataUrl;
-        }
+        if (imageData(dataUrl)) return dataUrl;
       }
     } catch {
       // Tainted canvas — fall through
@@ -72,9 +83,8 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
 
   // 2. Try direct fetch from content script (with timeout)
   try {
-    const resp = await fetchWithTimeout(src);
-    if (resp.ok) {
-      const blob = await resp.blob();
+    const blob = await fetchImageBlob(src);
+    if (blob?.type.startsWith('image/')) {
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -87,13 +97,15 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
   }
 
   // 3. Background CORS proxy (with timeout)
+  if (!src.startsWith('https:') || !globalThis.chrome?.runtime) return '';
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       resolve('');
     }, 5000);
     chrome.runtime.sendMessage({ action: 'FETCH_IMAGE_BASE64', url: src }, (resp) => {
       clearTimeout(timer);
-      resolve(resp?.base64 || '');
+      void chrome.runtime.lastError;
+      resolve(imageData(resp?.base64) ? resp.base64 : '');
     });
   });
 }
@@ -112,7 +124,8 @@ interface RoleCandidate {
 
 const RECOGNIZED_ROLES = new Set(['user', 'assistant']);
 
-const TURN_SELECTOR = '[data-testid^="conversation-turn-"]';
+const TURN_SHELL_SELECTOR = '[data-turn-id][data-turn="user"], [data-turn-id][data-turn="assistant"]';
+const TURN_SELECTOR = `[data-testid^="conversation-turn-"], ${TURN_SHELL_SELECTOR}`;
 
 const MESSAGE_SELECTORS = [
   // Legacy UI: role is declared directly on the message element
@@ -277,10 +290,23 @@ const collectTurnFallbackCandidates = (root: Element): RoleCandidate[] => {
     candidates.push({
       el: roleEl ?? turn,
       scope: turn,
-      role: roleEl ? resolveExplicitRole(roleEl) : null,
+      role: roleEl ? resolveExplicitRole(roleEl) : resolveTurnRole(turn),
     });
   }
   return candidates;
+};
+
+const resolveTurnRole = (turn: Element): 'user' | 'assistant' | null => {
+  const role = turn.getAttribute('data-turn');
+  return role === 'user' || role === 'assistant' ? role : null;
+};
+
+const collectCandidates = (root: Element): RoleCandidate[] => {
+  const explicit = collectMessageCandidates(root);
+  const fallback = collectTurnFallbackCandidates(root).filter(turn =>
+    !explicit.some(candidate => turn.scope.contains(candidate.el) || candidate.el.contains(turn.el))
+  );
+  return [...explicit, ...fallback].sort((a, b) => documentOrder(a.el, b.el));
 };
 
 // ---------------------------------------------------------------------------
@@ -341,11 +367,18 @@ const belongsToOtherCandidate = (
   return owner.el !== candidate.el;
 };
 
+interface CaptureImages {
+  names: Set<string>;
+  saved: number;
+  missing: number;
+}
+
+const newImageCapture = (): CaptureImages => ({ names: new Set(), saved: 0, missing: 0 });
+
 const collectImages = async (
   candidate: RoleCandidate,
   candidates: RoleCandidate[],
-  imageCount: number,
-  imageNames: Set<string>
+  imageCapture: CaptureImages
 ): Promise<AttachedFile[]> => {
   const files: AttachedFile[] = [];
   const images = Array.from(candidate.scope.querySelectorAll('img'))
@@ -355,42 +388,32 @@ const collectImages = async (
     const src = getImageSource(img);
     const alt = img.getAttribute('alt') || '';
 
-    const isAvatarOrProfile =
-      src.includes('profile') ||
-      src.includes('avatar') ||
-      src.includes('logo') ||
-      alt.toLowerCase().includes('avatar') ||
-      alt.toLowerCase().includes('profile') ||
-      img.closest('[class*="avatar"]') !== null;
+    const isDecorative = img.closest('[class*="avatar"], [data-testid*="avatar"], [class*="favicon"]') !== null;
 
-    if (isAvatarOrProfile) continue;
+    if (isDecorative || !src) continue;
 
-    if (src) {
-      const base64 = await imageToBase64(img);
-      if (base64 && base64.length > 100) {
-        const isDup = files.some(f => f.content === base64);
-        if (!isDup) {
-          // Numbering continues across messages: count images already captured
-          // by earlier messages plus the ones collected for this message.
-          const type = base64.match(/^data:(image\/[^;,]+)/)?.[1] || 'image/png';
-          const extension = type === 'image/jpeg' ? 'jpg' : type.split('/')[1].replace(/[^a-z0-9]/gi, '') || 'png';
-          const originalName = (alt || `image-${imageCount + files.length + 1}.${extension}`).replace(/[\\/]/g, '_');
-          let name = originalName;
-          let duplicate = 2;
-          while (imageNames.has(name)) {
-            const dot = originalName.lastIndexOf('.');
-            name = dot > 0 ? `${originalName.slice(0, dot)}-${duplicate++}${originalName.slice(dot)}` : `${originalName}-${duplicate++}`;
-          }
-          imageNames.add(name);
-          files.push({
-            name,
-            type,
-            content: base64
-          });
-        }
+    const base64 = await imageToBase64(img, src);
+    if (!imageData(base64)) {
+      imageCapture.missing++;
+      continue;
+    }
+    if (!files.some(file => file.content === base64)) {
+      // Numbering continues across messages: count images already captured
+      // by earlier messages plus the ones collected for this message.
+      const type = base64.match(/^data:(image\/[^;,]+)/)?.[1] || 'image/png';
+      const extension = type === 'image/jpeg' ? 'jpg' : type.split('/')[1].replace(/[^a-z0-9]/gi, '') || 'png';
+      const originalName = (alt || `image-${imageCapture.saved + files.length + 1}.${extension}`).replace(/[\\/]/g, '_');
+      let name = originalName;
+      let duplicate = 2;
+      while (imageCapture.names.has(name)) {
+        const dot = originalName.lastIndexOf('.');
+        name = dot > 0 ? `${originalName.slice(0, dot)}-${duplicate++}${originalName.slice(dot)}` : `${originalName}-${duplicate++}`;
       }
+      imageCapture.names.add(name);
+      files.push({ name, type, content: base64 });
     }
   }
+  imageCapture.saved += files.length;
   return files;
 };
 
@@ -421,8 +444,138 @@ const collectFilePills = (
   return files;
 };
 
+async function readMessage(
+  candidate: RoleCandidate,
+  candidates: RoleCandidate[],
+  imageCapture: CaptureImages
+): Promise<Message | null> {
+  const role = candidate.role ?? (candidate.el.querySelector(ASSISTANT_CONTENT) ? 'assistant' : 'user');
+  const content = elementToMarkdown(selectContentNode(candidate.el, role)).trim();
+  const missingBeforeMessage = imageCapture.missing;
+  const files = await collectImages(candidate, candidates, imageCapture);
+  for (const file of collectFilePills(candidate, candidates)) {
+    if (!files.some(existing => existing.name === file.name)) files.push(file);
+  }
+  return content || files.length || imageCapture.missing > missingBeforeMessage
+    ? { role, content, files: files.length ? files : undefined }
+    : null;
+}
+
+type ReportProgress = (current: number, total: number, step: string) => void;
+
+const getTurnShells = (root: Element): HTMLElement[] =>
+  Array.from(root.querySelectorAll<HTMLElement>(TURN_SHELL_SELECTOR)).filter(isConversationNode);
+
+const TURN_MEDIA = 'img, a[download], [class*="file-pill"]';
+
+function mountedTurnCandidates(shell: Element): RoleCandidate[] {
+  const candidates = collectMessageCandidates(shell).filter(candidate =>
+    !!candidate.el.textContent?.trim() || !!candidate.scope.querySelector(TURN_MEDIA)
+  );
+  if (candidates.length) return candidates;
+  const content = shell.querySelector(`${ASSISTANT_CONTENT}, ${USER_CONTENT}, ${TURN_MEDIA}`);
+  return content && (content.matches(TURN_MEDIA) || !!content.textContent?.trim() || !!shell.querySelector(TURN_MEDIA))
+    ? [{ el: shell, scope: shell, role: resolveTurnRole(shell) }]
+    : [];
+}
+
+const countImages = (message: Message): number =>
+  message.files?.filter(file => file.type.startsWith('image/')).length ?? 0;
+
+async function readVirtualizedTurns(
+  root: Element,
+  shells: HTMLElement[],
+  assertSameConversation: () => void,
+  imageCapture: CaptureImages,
+  onProgress?: ReportProgress
+): Promise<Message[]> {
+  const initialUrl = location.href.split('#')[0];
+  const initialTitle = document.title;
+  const turnIds = shells.map(shell => shell.getAttribute('data-turn-id'));
+  if (new Set(turnIds).size !== shells.length) throw new Error('ChatGPT displayed duplicate turns. Refresh the chat and try again.');
+  const scroller = shells[0].closest<HTMLElement>('[data-scroll-root], .thread-scroll-container') ?? document.scrollingElement;
+  const initialScroll = scroller?.scrollTop ?? 0;
+  const saved: Message[] = [];
+  let scrolled = false;
+
+  try {
+    for (let i = 0; i < shells.length; i++) {
+      const shell = shells[i];
+      const verifyTurn = () => {
+        assertSameConversation();
+        if (!root.contains(shell) || !isConversationNode(shell) || shell.getAttribute('data-turn-id') !== turnIds[i]) {
+          throw new Error('ChatGPT replaced a message during capture. Nothing was saved. Try again after the reply finishes.');
+        }
+      };
+      onProgress?.(i, shells.length, `Loading message ${i + 1} of ${shells.length}...`);
+      verifyTurn();
+      let candidates = mountedTurnCandidates(shell);
+      if (!candidates.length) {
+        scrolled = true;
+        shell.scrollIntoView({ block: 'center', behavior: 'instant' });
+        for (let attempt = 0; attempt < 40 && !candidates.length; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          verifyTurn();
+          candidates = mountedTurnCandidates(shell);
+        }
+      }
+      if (!candidates.length) {
+        throw new Error(`ChatGPT did not load message ${i + 1} of ${shells.length}. Nothing was saved. Keep the chat tab open and try again.`);
+      }
+
+      let changed = false;
+      const observer = new MutationObserver(() => { changed = true; });
+      observer.observe(shell, {
+        childList: true, characterData: true, subtree: true, attributes: true,
+        attributeFilter: ['data-message-id', 'data-message-author-role', 'data-message-role', 'data-content-search-unit-key'],
+      });
+      const savedBeforeTurn = saved.length;
+      try {
+        for (const candidate of candidates) {
+          const message = await readMessage(candidate, candidates, imageCapture);
+          verifyTurn();
+          if (changed || observer.takeRecords().length) {
+            throw new Error('ChatGPT changed a message during capture. Nothing was saved. Keep the chat tab open and try again.');
+          }
+          if (message) saved.push(message);
+        }
+      } finally {
+        observer.disconnect();
+      }
+      if (savedBeforeTurn === saved.length) throw new Error(`ChatGPT did not display message ${i + 1} of ${shells.length}. Nothing was saved.`);
+    }
+    const currentShells = getTurnShells(root);
+    if (currentShells.length !== shells.length || currentShells.some((shell, i) =>
+      shell !== shells[i] || shell.getAttribute('data-turn-id') !== turnIds[i]
+    )) {
+      throw new Error('ChatGPT changed the conversation during capture. Nothing was saved. Refresh the chat and try again.');
+    }
+    return saved;
+  } finally {
+    if (scrolled && scroller?.isConnected && root.isConnected &&
+        location.href.split('#')[0] === initialUrl && document.title === initialTitle) {
+      scroller.scrollTop = initialScroll;
+    }
+  }
+}
+
+function buildSession(sourceTitle: string, messages: Message[], missingImageCount: number): Omit<Session, 'id' | 'platform'> {
+  let title = sourceTitle || 'ChatGPT Handoff';
+  if (title === 'ChatGPT' || title.trim() === '') {
+    const firstUser = messages.find(message => message.role === 'user' && message.content.trim());
+    title = firstUser ? firstUser.content.substring(0, 40) + '...' : 'ChatGPT Handoff';
+  }
+  const imageCount = messages.reduce((count, message) => count + countImages(message), 0);
+  const fileCount = messages.reduce((count, message) => count + (message.files?.length ?? 0), 0) - imageCount;
+  return {
+    title, messages, messageCount: messages.length, imageCount, fileCount,
+    ...(missingImageCount > 0 ? { missingImageCount } : {}),
+    savedAt: new Date().toISOString(), startedAt: new Date().toISOString(),
+  };
+}
+
 export const scrapeChatGPT = async (
-  onProgress?: (current: number, total: number, step: string) => void
+  onProgress?: ReportProgress
 ): Promise<Omit<Session, 'id' | 'platform'>> => {
   onProgress?.(0, 1, 'Finding messages...');
 
@@ -434,14 +587,29 @@ export const scrapeChatGPT = async (
       throw new Error('ChatGPT changed conversations during capture. Nothing was saved. Wait for the chat to load, then capture again.');
     }
   };
-  const explicit = collectMessageCandidates(root);
-  // Also retain unlabelled turns on mixed-layout pages. A labelled turn already
-  // represented by an explicit candidate must not be emitted again.
-  const fallback = collectTurnFallbackCandidates(root).filter(turn =>
-    !explicit.some(candidate => turn.scope.contains(candidate.el) || candidate.el.contains(turn.el))
-  );
-  const candidates = [...explicit, ...fallback].sort((a, b) => documentOrder(a.el, b.el));
+  const mounted = collectCandidates(root);
+  const visible = new Map<string, Message>();
+  for (const candidate of mounted) {
+    const id = candidate.el.getAttribute('data-message-id') ?? candidate.el.querySelector('[data-message-id]')?.getAttribute('data-message-id');
+    if (!id || !candidate.role) continue;
+    visible.set(id, {
+      role: candidate.role,
+      content: elementToMarkdown(selectContentNode(candidate.el, candidate.role)).trim(),
+      files: collectFilePills(candidate, mounted),
+    });
+  }
+  const history = await readChatGPTHistory(sourceUrl, visible, assertSameConversation, onProgress);
+  assertSameConversation();
+  if (history) return buildSession(sourceTitle, history.messages, history.missingImageCount);
 
+  const imageCapture = newImageCapture();
+  const shells = getTurnShells(root);
+  if (shells.some(shell => !mountedTurnCandidates(shell).length)) {
+    const messages = await readVirtualizedTurns(root, shells, assertSameConversation, imageCapture, onProgress);
+    return buildSession(sourceTitle, messages, imageCapture.missing);
+  }
+
+  const candidates = collectCandidates(root);
   if (candidates.length === 0) {
     throw new Error('No messages found. Are you in a chat session?');
   }
@@ -470,50 +638,19 @@ export const scrapeChatGPT = async (
     assertCurrentCandidates();
 
     const messages: Message[] = [];
-    let imageCount = 0;
-    let fileCount = 0;
-    const imageNames = new Set<string>();
 
     for (let i = 0; i < candidates.length; i++) {
       const candidate = candidates[i];
       assertCurrentCandidates(candidate);
       onProgress?.(i + 1, candidates.length, `Processing message ${i + 1}/${candidates.length}...`);
 
-      // Explicit user/assistant roles always win; infer only unlabelled turns.
-      let role: 'user' | 'assistant' = 'user';
-      if (candidate.role) {
-        role = candidate.role;
-      } else if (candidate.el.querySelector(ASSISTANT_CONTENT)) {
-        role = 'assistant';
-      }
-
-      const contentNode = selectContentNode(candidate.el, role);
-      const text = elementToMarkdown(contentNode);
-
-      // Include adjacent attachments inside the same turn, never a cached chat.
-      const files: AttachedFile[] = [];
-      const images = await collectImages(candidate, candidates, imageCount, imageNames);
-      imageCount += images.length;
-      files.push(...images);
-      for (const pill of collectFilePills(candidate, candidates)) {
-        if (files.some(file => file.name === pill.name)) continue;
-        fileCount++;
-        files.push(pill);
-      }
-
-      if (text.trim() || files.length > 0) {
-        messages.push({ role, content: text.trim(), files: files.length > 0 ? files : undefined });
-      }
+      const message = await readMessage(candidate, candidates, imageCapture);
+      if (message) messages.push(message);
     }
 
     if (messages.length === 0) throw new Error('No messages found. Are you in a chat session?');
     assertCurrentCandidates();
-    let title = sourceTitle || 'ChatGPT Handoff';
-    if (title === 'ChatGPT' || title.trim() === '') {
-      const firstUserMsg = messages.find(m => m.role === 'user' && m.content.trim());
-      title = firstUserMsg ? firstUserMsg.content.substring(0, 40) + '...' : 'ChatGPT Handoff';
-    }
-    return { title, messages, messageCount: messages.length, imageCount, fileCount, savedAt: new Date().toISOString(), startedAt: new Date().toISOString() };
+    return buildSession(sourceTitle, messages, imageCapture.missing);
   } finally {
     observer.disconnect();
   }

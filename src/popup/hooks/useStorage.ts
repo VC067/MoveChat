@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { Session, Settings } from '../../shared/types';
+import type { Session, SessionEdit, Settings } from '../../shared/types';
 import { getSessions, saveSessions, getSettings, saveSettings, DEFAULT_SETTINGS } from '../../shared/storage';
 
 const DEFAULT_AI_SUMMARY = {
@@ -9,7 +9,7 @@ const DEFAULT_AI_SUMMARY = {
   summaryTemplate: 'Provide a comprehensive summary of this conversation that can be handed off to another AI agent. Include: 1) The main goal/topic, 2) Key decisions made, 3) Important context and constraints, 4) Current state and next steps, 5) Any code or technical details that are essential.',
 };
 
-const migrateSettings = (raw: any): Settings => {
+const migrateSettings = (raw: Partial<Settings>): Settings => {
   // Handle migration from old aiCompression format to new aiSummary
   const aiSummary = raw.aiSummary || DEFAULT_AI_SUMMARY;
   let handoffTemplatePdf = raw.handoffTemplatePdf || DEFAULT_SETTINGS.handoffTemplatePdf;
@@ -52,12 +52,21 @@ export const useStorage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let sessionsChanged = false;
+    const onStorageChange: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (changes, area) => {
+      if (area === 'local' && changes.sessions) {
+        sessionsChanged = true;
+        setSessions((changes.sessions.newValue as Session[] | undefined) ?? []);
+      }
+    };
+    const storageEvents = globalThis.chrome?.storage?.onChanged;
+    storageEvents?.addListener(onStorageChange);
     const loadAll = async () => {
       try {
         const storedSessions = await getSessions();
+        if (!sessionsChanged) setSessions(storedSessions);
         const rawSettings = await getSettings();
         const storedSettings = migrateSettings(rawSettings);
-        setSessions(storedSessions);
         setSettings(storedSettings);
         // Apply theme synchronously before paint
         applyThemeToDom(storedSettings.theme);
@@ -67,25 +76,21 @@ export const useStorage = () => {
         setLoading(false);
       }
     };
-    loadAll();
+    void loadAll();
+    return () => storageEvents?.removeListener(onStorageChange);
   }, []);
 
-  const addSession = async (newSession: Session) => {
-    const updated = [newSession, ...sessions];
-    setSessions(updated);
+  const editSessions = async (edit: SessionEdit['edit']) => {
+    if (globalThis.chrome?.runtime) {
+      const response = await chrome.runtime.sendMessage<SessionEdit, { error?: string }>({ action: 'EDIT_SESSIONS', edit });
+      if (response.error) throw new Error(response.error);
+      return;
+    }
+    const updated = edit.type === 'delete'
+      ? sessions.filter(session => !edit.ids.includes(session.id))
+      : sessions.map(session => session.id === edit.id ? { ...session, title: edit.title } : session);
     await saveSessions(updated);
-  };
-
-  const deleteSession = async (id: string) => {
-    const updated = sessions.filter(s => s.id !== id);
     setSessions(updated);
-    await saveSessions(updated);
-  };
-
-  const deleteSessions = async (ids: string[]) => {
-    const updated = sessions.filter(s => !ids.includes(s.id));
-    setSessions(updated);
-    await saveSessions(updated);
   };
 
   const updateSettings = async (newSettings: Settings) => {
@@ -98,9 +103,9 @@ export const useStorage = () => {
     sessions,
     settings,
     loading,
-    addSession,
-    deleteSession,
-    deleteSessions,
+    deleteSession: (id: string) => editSessions({ type: 'delete', ids: [id] }),
+    deleteSessions: (ids: string[]) => editSessions({ type: 'delete', ids }),
+    renameSession: (id: string, title: string) => editSessions({ type: 'rename', id, title }),
     updateSettings
   };
 };

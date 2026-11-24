@@ -4,10 +4,9 @@ import {
   MessageSquare, Image, Paperclip, Archive, AlertTriangle, Loader2, Sparkles
 } from 'lucide-react';
 import JSZip from 'jszip';
-import type { Session, Settings } from '../../shared/types';
+import type { PendingHandoff, Session, Settings } from '../../shared/types';
 import { generateMarkdown } from '../../shared/markdown';
 import { generatePdf } from '../../shared/pdf';
-import { setStorage } from '../../shared/storage';
 import PlatformLogo from './PlatformLogo';
 
 interface SessionDetailViewProps {
@@ -107,6 +106,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
   const [editedTitle, setEditedTitle] = useState(session.title);
   const [copied, setCopied] = useState(false);
   const [resuming, setResuming] = useState<string | null>(null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
   const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
 
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -217,9 +217,9 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
 
   const handleResume = async (targetPlatform: Session['platform']) => {
     setResuming(targetPlatform);
+    setResumeError(null);
     try {
       const handoffText = settings?.handoffTemplateMd || 'Attached is my previous conversation transcript.';
-      const format = 'md';
 
       const allAttachments: { name: string; type: string; content: string }[] = [];
       for (const msg of session.messages) {
@@ -237,34 +237,23 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
         }
       }
 
-      const executeHandoffRedirection = async (fileContent: string) => {
-        const pending = {
-          targetPlatform,
-          handoffText,
-          fileName: `movechat-history.${format}`,
-          mimeType: 'text/markdown',
-          fileContent,
-          attachments: allAttachments.length > 0 ? allAttachments : undefined,
-        };
-        await setStorage('pending_handoff', pending);
-
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-          chrome.runtime.sendMessage({
-            action: 'RESUME_CHAT',
-            targetPlatform,
-          }, () => {
-            window.close();
-          });
-        } else {
-          alert(`Dev Mode: Handoff stored in storage and redirected to ${targetPlatform}`);
-          setResuming(null);
-        }
+      const pending: PendingHandoff = {
+        targetPlatform,
+        handoffText,
+        fileName: 'movechat-history.md',
+        mimeType: 'text/markdown',
+        fileContent: generateMarkdown(session),
+        attachments: allAttachments.length ? allAttachments : undefined,
       };
-
-      const mdText = generateMarkdown(session);
-      await executeHandoffRedirection(mdText);
+      const temporary = session.platform === 'chatgpt' && new URLSearchParams(session.sourceUrl?.split('?')[1]?.split('#')[0]).get('temporary-chat') === 'true';
+      const result = await chrome.runtime.sendMessage<
+        { action: string; pending: PendingHandoff; temporary: boolean },
+        { success?: boolean; error?: string }
+      >({ action: 'RESUME_CHAT', pending, temporary });
+      if (!result.success) throw new Error(result.error || 'Unable to open the destination tab.');
+      window.close();
     } catch (err) {
-      console.error(err);
+      setResumeError(err instanceof Error ? err.message : 'Unable to resume this conversation.');
       setResuming(null);
     }
   };
@@ -276,8 +265,8 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     try {
       const result = await generateAiSummary(session, settings!);
       setSummaryResult(result);
-    } catch (err: any) {
-      setSummaryError(err.message || 'Failed to generate summary.');
+    } catch (err) {
+      setSummaryError(err instanceof Error ? err.message : 'Failed to generate summary.');
     } finally {
       setSummaryLoading(false);
     }
@@ -294,6 +283,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto flex flex-col bg-background select-none">
       <div className="flex-1 px-4 pt-2 pb-4 space-y-5">
+        {resumeError && <p role="alert" className="text-xs text-destructive">{resumeError}</p>}
         {/* Title */}
         <div>
           {isEditingTitle ? (
@@ -346,6 +336,12 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             <span>{session.fileCount}</span>
           </div>
         </div>
+
+        {!!session.missingImageCount && (
+          <p role="status" className="text-xs text-destructive">
+            {session.missingImageCount} {session.missingImageCount === 1 ? 'image couldn’t' : 'images couldn’t'} be saved.
+          </p>
+        )}
 
         {/* Resume Button */}
         <div className="relative">

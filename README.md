@@ -12,7 +12,7 @@
   <br/>
 
   <p align="center">
-    <a href="public/manifest.json"><img src="https://img.shields.io/badge/Version-v1.2.1-blue.svg?logo=github" alt="Version v1.2.1" /></a>&nbsp;
+    <a href="public/manifest.json"><img src="https://img.shields.io/badge/Version-v1.2.2-blue.svg?logo=github" alt="Version v1.2.2" /></a>&nbsp;
     <a href="https://chromewebstore.google.com/detail/cgpfngggfccdpjppachknliainihkbdg?utm_source=item-share-cb"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-v1.2.0-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Web Store" /></a>&nbsp;
     <a href="https://addons.mozilla.org/en-US/firefox/addon/movechat/"><img src="https://img.shields.io/badge/Firefox%20Add--ons-v1.2.1-FF7139?logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" /></a>&nbsp;
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>&nbsp;

@@ -2,13 +2,7 @@
 // tab/frame port, injects once if there is no receiving end, validates the
 // provenance reported by the content script against the target tab, and never
 // persists anything (the caller decides what to do with the session).
-import type { Session } from '../shared/types';
-
-export interface CaptureProgress {
-  current: number;
-  total: number;
-  step: string;
-}
+import type { CaptureProgress, Session } from '../shared/types';
 
 export type CapturedSession = Session & {
   sourceUrl: string;
@@ -18,13 +12,13 @@ export type CapturedSession = Session & {
 export type OnCaptureProgress = (progress: CaptureProgress) => void;
 
 export interface CaptureOptions {
-  /** Overall timeout in milliseconds. */
-  timeoutMs?: number;
+  /** Maximum time without capture progress, in milliseconds. */
+  idleTimeoutMs?: number;
 }
 
 const PORT_NAME = 'movechat-scrape';
 const CONTENT_SCRIPT_FILE = 'content.js';
-const DEFAULT_TIMEOUT_MS = 180_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 180_000;
 // Bounded: at most one injection across the whole capture.
 const MAX_INJECTS = 1;
 
@@ -96,9 +90,10 @@ export const captureTab = (
       return;
     }
 
-    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const idleTimeoutMs = options?.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastProgress: CaptureProgress | undefined;
     let injectsUsed = 0;
     let generation = 0;
     interface Attempt {
@@ -106,6 +101,7 @@ export const captureTab = (
       port: chrome.runtime.Port;
       detached: boolean;
       finalizing: boolean;
+      resultChunks?: string[];
       onMessage: (msg: unknown) => void;
       onDisconnect: () => void;
     }
@@ -146,9 +142,12 @@ export const captureTab = (
       else resolve(result!);
     };
 
-    timer = setTimeout(() => {
-      settle(new CaptureError('Capture timed out. Please refresh the page and try again.'));
-    }, timeoutMs);
+    const resetIdleTimer = (): void => {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        settle(new CaptureError('Capture timed out after it stopped making progress. Please refresh the page and try again.'));
+      }, idleTimeoutMs);
+    };
 
     const finalize = (msg: Record<string, unknown>, gen: number): void => {
       const payload = msg.session;
@@ -185,16 +184,37 @@ export const captureTab = (
     const handleMessage = (msg: Record<string, unknown>, gen: number): void => {
       if (!msg || typeof msg.type !== 'string') return;
       if (msg.type === 'progress') {
-        onProgress?.({
-          current: typeof msg.current === 'number' ? msg.current : 0,
-          total: typeof msg.total === 'number' ? msg.total : 0,
-          step: isNonEmptyString(msg.step) ? msg.step : '',
-        });
+        const { current, total, step } = msg;
+        if (typeof current !== 'number' || !Number.isFinite(current) ||
+            typeof total !== 'number' || !Number.isFinite(total) || !isNonEmptyString(step)) return;
+        if (lastProgress?.current === current && lastProgress.total === total && lastProgress.step === step) return;
+        lastProgress = { current, total, step };
+        resetIdleTimer();
+        onProgress?.(lastProgress);
         return;
       }
       if (msg.type === 'error') {
         settle(new CaptureError(isNonEmptyString(msg.error) ? msg.error : 'Capture failed.'));
         return;
+      }
+      if (msg.type === 'result-chunk' && attempt) {
+        const parts = attempt.resultChunks ??= [];
+        if (msg.index !== parts.length || !isNonEmptyString(msg.text)) {
+          settle(new CaptureError('The conversation transfer was incomplete. Please try saving it again.'));
+          return;
+        }
+        parts.push(msg.text);
+        resetIdleTimer();
+        if (!msg.final) return;
+        try {
+          const result: Record<string, unknown> = JSON.parse(parts.join(''));
+          attempt.resultChunks = undefined;
+          if (result?.type !== 'result') throw new Error('Invalid result');
+          msg = result;
+        } catch {
+          settle(new CaptureError('The conversation transfer was incomplete. Please try saving it again.'));
+          return;
+        }
       }
       if (msg.type !== 'result') return;
 
@@ -212,6 +232,7 @@ export const captureTab = (
         return;
       }
       if (attempt) attempt.finalizing = true;
+      resetIdleTimer();
       finalize(msg, gen);
     };
 
@@ -222,6 +243,7 @@ export const captureTab = (
         return;
       }
       injectsUsed += 1;
+      resetIdleTimer();
       // Detach before asynchronous injection. An old receiver must not race the
       // replacement with another result/error while executeScript is pending.
       if (attempt) {
@@ -261,6 +283,8 @@ export const captureTab = (
     };
 
     const startAttempt = (): void => {
+      lastProgress = undefined;
+      resetIdleTimer();
       generation += 1;
       const gen = generation;
       let port: chrome.runtime.Port;

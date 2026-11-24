@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.2.2
+
+### Fixed
+
+- Finish saving a conversation after the extension popup closes and restore the progress display when it reopens. (#6)
+- Keep the transcript and supporting files attached when ChatGPT replaces the composer. Retry missing files without using the camera input and wait for the prompt and all attachments before Auto-send. (#5)
+- Resume a saved ChatGPT Temporary Chat in Temporary Chat mode and deliver each handoff only to the tab opened for it.
+- Let long captures continue past three minutes while progress advances, and time out stalled captures. (#7)
+- Retrieve the active ChatGPT conversation and its images even when older messages are outside the viewport. Save the transcript and flag unavailable images when an image download fails.
+- Save larger local conversations, transfer large captures in chunks, and keep the transcript if image data exceeds available storage.
+- Overlap scroll steps in DeepSeek to capture turns that load near the edge of the viewport.
+- Resume large saved conversations when the handoff exceeds the browser's temporary storage quota.
+
 ## v1.2.1 — 2026-10-18
 
 ### Fixed

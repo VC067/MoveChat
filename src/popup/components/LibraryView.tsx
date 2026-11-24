@@ -3,25 +3,20 @@ import {
   Search, Download, RefreshCw, AlertCircle, ChevronRight, Lock,
   CheckSquare, Square, Trash2
 } from 'lucide-react';
-import type { Session } from '../../shared/types';
+import type { CaptureProgress, Session } from '../../shared/types';
 import { generateMarkdown } from '../../shared/markdown';
 import JSZip from 'jszip';
 import PlatformLogo from './PlatformLogo';
-
-interface CaptureProgress {
-  current: number;
-  total: number;
-  step: string;
-}
 
 interface LibraryViewProps {
   sessions: Session[];
   lastCapturedSession: Session | null;
   captureProgress: CaptureProgress | null;
+  captureError?: string;
   onSelectSession: (session: Session) => void;
   onSelectProvider: (provider: string) => void;
   onDeleteSessions: (ids: string[]) => void;
-  onCapture: () => Promise<Session | null>;
+  onCapture: () => void;
   onViewAll: () => void;
 }
 
@@ -37,6 +32,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   sessions,
   lastCapturedSession,
   captureProgress,
+  captureError,
   onSelectSession,
   onSelectProvider,
   onDeleteSessions,
@@ -44,8 +40,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onViewAll,
 }) => {
   const [activeTabPlatform, setActiveTabPlatform] = useState<'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'deepseek' | null>(null);
-  const [capturing, setCapturing] = useState(false);
-  const [captureError, setCaptureError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -64,21 +58,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       });
     }
   }, []);
-
-  const handleCapture = async () => {
-    setCapturing(true);
-    setCaptureError(null);
-    try {
-      const res = await onCapture();
-      if (!res) {
-        setCaptureError('Failed to capture. Make sure you have a chat active on the page.');
-      }
-    } catch (err: any) {
-      setCaptureError(err.message || 'Capture failed.');
-    } finally {
-      setCapturing(false);
-    }
-  };
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -184,35 +163,33 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <p className="text-xs text-muted-foreground mb-4">
                 Save this conversation for export, transfer, or continuation.
               </p>
-              {capturing || captureProgress ? (
+              {captureProgress ? (
                 <div className="space-y-3">
                   <button disabled className="btn-primary opacity-70">
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     Saving...
                   </button>
-                  {captureProgress && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground truncate max-w-[200px]">
-                          {captureProgress.step}
-                        </span>
-                        <span className="text-muted-foreground font-medium tabular-nums ml-2">
-                          {captureProgress.current}/{captureProgress.total}
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-foreground/70 rounded-full transition-all duration-300 ease-out"
-                          style={{
-                            width: `${Math.min(100, (captureProgress.current / Math.max(1, captureProgress.total)) * 100)}%`,
-                          }}
-                        />
-                      </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground truncate max-w-[200px]">
+                        {captureProgress.step}
+                      </span>
+                      <span className="text-muted-foreground font-medium tabular-nums ml-2">
+                        {captureProgress.current}/{captureProgress.total}
+                      </span>
                     </div>
-                  )}
+                    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-foreground/70 rounded-full transition-all duration-300 ease-out"
+                        style={{
+                          width: `${Math.min(100, (captureProgress.current / Math.max(1, captureProgress.total)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <button onClick={handleCapture} className="btn-primary">
+                <button onClick={onCapture} className="btn-primary">
                   <Download className="w-4 h-4" />
                   Save Conversation
                 </button>
@@ -267,6 +244,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       </span>
                     ) : null}
                   </div>
+                  {!!lastCapturedSession.missingImageCount && (
+                    <p className="mt-1 text-xs text-destructive">
+                      {lastCapturedSession.missingImageCount} {lastCapturedSession.missingImageCount === 1 ? 'image couldn’t' : 'images couldn’t'} be saved.
+                    </p>
+                  )}
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               </div>

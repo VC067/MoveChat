@@ -81,6 +81,7 @@
       <tr><th>Permission</th><th>Purpose</th></tr>
       <tr><td><code>activeTab</code></td><td>Capture conversations from the currently active tab</td></tr>
       <tr><td><code>storage</code></td><td>Store conversations, settings, and API keys locally</td></tr>
+      <tr><td><code>unlimitedStorage</code></td><td>Save large conversations and attachments on your device</td></tr>
       <tr><td><code>tabs</code></td><td>Open new tabs when resuming conversations on other platforms</td></tr>
       <tr><td><code>scripting</code></td><td>Inject content scripts into chat platform pages</td></tr>
     </table>
@@ -112,7 +113,8 @@
     <p>The only external communication is between your browser and:</p>
     <ul>
       <li><strong>AI provider APIs</strong> — only if you configure AI Summary (e.g., <code>api.openai.com</code>, <code>api.anthropic.com</code>, <code>generativelanguage.googleapis.com</code>). This communication is initiated by you, not by the extension.</li>
-      <li><strong>Image CDN domains</strong> — when exporting conversations that contain images hosted outside the main platform (e.g., <code>oaiusercontent.com</code>, <code>googleusercontent.com</code>). These fetches are triggered during PDF/ZIP export only.</li>
+      <li><strong>ChatGPT</strong> — when you save the open conversation, MoveChat uses the existing ChatGPT sign-in to request that conversation and its attachments from ChatGPT. Any session token needed for these requests stays in browser memory and is sent only to <code>chatgpt.com</code>.</li>
+      <li><strong>Image CDN domains</strong> — during capture or export of conversations with images hosted outside the main platform (e.g., <code>oaiusercontent.com</code>, <code>googleusercontent.com</code>).</li>
     </ul>
 
     <h2>Open Source</h2>

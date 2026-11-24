@@ -109,7 +109,9 @@ export const injectGemini = async (pending: PendingHandoff) => {
       // Attempt command insertion first
       try {
         document.execCommand('insertText', false, handoffText);
-      } catch (_) {}
+      } catch {
+        // Fall back to setting the editor content directly.
+      }
 
       // Verify and set content if insertText failed or didn't update
       if (!editor.textContent || !editor.textContent.includes(handoffText.substring(0, 10))) {
@@ -135,7 +137,9 @@ export const injectGemini = async (pending: PendingHandoff) => {
           if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
-          } catch (_) {}
+          } catch {
+            // Skip attachments that cannot be converted to a File.
+          }
         }
       }
 
@@ -152,7 +156,9 @@ export const injectGemini = async (pending: PendingHandoff) => {
           clipboardData: dataTransfer
         });
         editor.dispatchEvent(pasteEvent);
-      } catch (_) {}
+      } catch {
+        // Some browsers do not support constructing paste events this way.
+      }
 
       if (settings.autoSend) {
         setTimeout(() => {

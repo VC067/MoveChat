@@ -65,7 +65,9 @@ export const injectClaude = async (pending: PendingHandoff) => {
           if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
-          } catch (_) {}
+          } catch {
+            // Skip attachments that cannot be converted to a File.
+          }
         }
       }
       fileInput.files = dataTransfer.files;

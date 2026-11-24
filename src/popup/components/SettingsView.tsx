@@ -125,7 +125,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <select
                   value={provider}
                   onChange={e => {
-                    const prov = e.target.value as any;
+                    const prov = e.target.value as Settings['aiSummary']['provider'];
                     setProvider(prov);
                     if (prov === 'openai') setModel('gpt-5.5');
                     else if (prov === 'anthropic') setModel('claude-sonnet-4.5');

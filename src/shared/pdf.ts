@@ -828,8 +828,9 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
 
   // Metadata Info Card
   doc.setFontSize(8.5);
-  const sourceLines: string[] = session.sourceUrl ? doc.splitTextToSize(`Source: ${session.sourceUrl}`, contentWidth - 8) : [];
-  const cardHeight = 24 + sourceLines.length * 4;
+  const metadataLines: string[] = session.sourceUrl ? doc.splitTextToSize(`Source: ${session.sourceUrl}`, contentWidth - 8) : [];
+  if (session.missingImageCount) metadataLines.push(`Images unavailable at capture: ${session.missingImageCount}`);
+  const cardHeight = 24 + metadataLines.length * 4;
   doc.setFillColor(248, 250, 252); // slate-50 background
   doc.setDrawColor(241, 245, 249); // slate-100 border
   doc.setLineWidth(0.3);
@@ -853,7 +854,7 @@ export const generatePdf = async (session: Session): Promise<Blob> => {
   cardY += 5;
   
   doc.text(`Stats: ${session.messageCount} messages    |    ${session.imageCount} images    |    ${session.fileCount} files`, margin + 4, cardY);
-  sourceLines.forEach(line => {
+  metadataLines.forEach(line => {
     cardY += 4;
     doc.text(line, margin + 4, cardY);
   });

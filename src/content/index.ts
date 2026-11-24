@@ -8,7 +8,6 @@ import { injectClaude } from './injectors/claude';
 import { injectGemini } from './injectors/gemini';
 import { injectPerplexity } from './injectors/perplexity';
 import { injectDeepSeek } from './injectors/deepseek';
-import { getStorage, setStorage } from './storage';
 import type { PendingHandoff } from '../shared/types';
 import { captureFromPage } from './capture-context';
 
@@ -31,17 +30,11 @@ const getPlatform = (): 'chatgpt' | 'claude' | 'gemini' | 'perplexity' | 'deepse
 
 const checkPendingHandoff = async () => {
   const platform = getPlatform();
-  if (!platform) return;
+  if (!platform || (platform === 'chatgpt' && window.location.pathname !== '/')) return;
 
-  const pending = await getStorage<PendingHandoff | null>('pending_handoff', null);
-  if (!pending || pending.targetPlatform !== platform) return;
-
-  // Clear immediately to prevent multiple triggers
-  await setStorage('pending_handoff', null);
-
-  console.log('[MoveChat] Found pending handoff, running injection...', pending);
-  
   try {
+    const pending = await chrome.runtime.sendMessage<{ action: string }, PendingHandoff | null>({ action: 'CLAIM_HANDOFF' });
+    if (!pending || pending.targetPlatform !== platform) return;
     if (platform === 'chatgpt') await injectChatGPT(pending);
     else if (platform === 'claude') await injectClaude(pending);
     else if (platform === 'gemini') await injectGemini(pending);
@@ -54,9 +47,9 @@ const checkPendingHandoff = async () => {
 
 const runScrape = async (platform: string, onProgress?: (cur: number, total: number, step: string) => void) => {
   if (platform === 'chatgpt') return await scrapeChatGPT(onProgress);
-  if (platform === 'claude') return await scrapeClaude();
-  if (platform === 'gemini') return await scrapeGemini();
-  if (platform === 'perplexity') return await scrapePerplexity();
+  if (platform === 'claude') return await scrapeClaude(onProgress);
+  if (platform === 'gemini') return await scrapeGemini(onProgress);
+  if (platform === 'perplexity') return await scrapePerplexity(onProgress);
   if (platform === 'deepseek') return await scrapeDeepSeek(onProgress);
   throw new Error('Unsupported platform');
 };
@@ -88,7 +81,17 @@ const onConnect = (port: chrome.runtime.Port) => {
     post({ type: 'progress', current: cur, total, step });
   }))
     .then(({ result: sessionData, sourceUrl, sourceTitle }) => {
-      post({ type: 'result', sourceUrl, sourceTitle, session: { ...sessionData, platform, sourceUrl } });
+      const result = { type: 'result', sourceUrl, sourceTitle, session: { ...sessionData, platform, sourceUrl } };
+      const json = JSON.stringify(result);
+      const chunkSize = 4 * 1024 * 1024;
+      if (json.length <= chunkSize) {
+        post(result);
+        return;
+      }
+      // Send large image payloads in bounded port messages.
+      for (let offset = 0; connected && offset < json.length; offset += chunkSize) {
+        post({ type: 'result-chunk', index: offset / chunkSize, text: json.slice(offset, offset + chunkSize), final: offset + chunkSize >= json.length });
+      }
     })
     .catch(err => {
       post({ type: 'error', error: err instanceof Error ? err.message : String(err) });

@@ -20,10 +20,28 @@ export interface Session {
   platform: 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'deepseek';
   messageCount: number;
   imageCount: number;
+  missingImageCount?: number;
   fileCount: number;
   startedAt: string;
   savedAt: string;
   messages: Message[];
+}
+
+export interface CaptureProgress {
+  current: number;
+  total: number;
+  step: string;
+}
+
+export interface CaptureStatus {
+  progress?: CaptureProgress;
+  sessionId?: string;
+  error?: string;
+}
+
+export interface SessionEdit {
+  action: 'EDIT_SESSIONS';
+  edit: { type: 'delete'; ids: string[] } | { type: 'rename'; id: string; title: string };
 }
 
 export interface AISummarySettings {
