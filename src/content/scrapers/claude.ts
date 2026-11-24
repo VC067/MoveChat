@@ -1,4 +1,4 @@
-import type { Message, AttachedFile } from '../../shared/types';
+import type { Message, AttachedFile, Session } from '../../shared/types';
 import { elementToMarkdown } from '../dom';
 
 // Wait for an image element to complete loading
@@ -49,8 +49,8 @@ async function imageToBase64(img: HTMLImageElement, log: (s:string)=>void): Prom
           log('Canvas returned empty dataUrl.');
         }
       }
-    } catch (e: any) {
-      log(`Canvas tainted/failed: ${e.message}`);
+    } catch (error) {
+      log(`Canvas tainted/failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   } else {
     log('Skipped canvas due to 0x0 size');
@@ -71,8 +71,8 @@ async function imageToBase64(img: HTMLImageElement, log: (s:string)=>void): Prom
     } else {
       log(`Content script fetch failed with HTTP ${resp.status}`);
     }
-  } catch (e: any) {
-    log(`Content script fetch failed: ${e.message}`);
+  } catch (error) {
+    log(`Content script fetch failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // 3. Background CORS proxy (with timeout)
@@ -97,7 +97,7 @@ async function imageToBase64(img: HTMLImageElement, log: (s:string)=>void): Prom
 
 export const scrapeClaude = async (
   onProgress?: (current: number, total: number, step: string) => void
-): Promise<any> => {
+): Promise<Omit<Session, 'id' | 'platform'>> => {
   onProgress?.(0, 1, 'Finding Claude messages...');
   const debugLogs: string[] = [];
   const log = (msg: string) => {

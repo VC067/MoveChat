@@ -2,202 +2,192 @@ import type { PendingHandoff, Settings, AttachedFile } from '../../shared/types'
 import { getStorage } from '../storage';
 
 function attachedFileToFile(attached: AttachedFile): File {
-  if (attached.content && attached.content.startsWith('data:')) {
-    // base64 data URL → Blob → File
-    const parts = attached.content.split(',');
-    const byteCharacters = atob(parts[1] || parts[0]);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
+  const content = attached.content || '';
+  if (!content.startsWith('data:')) {
+    return new File([content], attached.name, { type: attached.type });
+  }
+  const bytes = Uint8Array.from(atob(content.slice(content.indexOf(',') + 1)), char => char.charCodeAt(0));
+  return new File([bytes], attached.name, { type: attached.type });
+}
+
+function buildFiles(pending: PendingHandoff): File[] {
+  const main = attachedFileToFile({
+    name: pending.fileName,
+    type: pending.mimeType,
+    content: pending.mimeType !== 'text/markdown' && !pending.fileContent.startsWith('data:')
+      ? `data:${pending.mimeType};base64,${pending.fileContent}`
+      : pending.fileContent,
+  });
+  const files = [main];
+  const usedNames = new Set([main.name]);
+  for (const attachment of pending.attachments || []) {
+    if (attachment.name === 'debug_log.txt') continue;
+    const file = attachedFileToFile(attachment);
+    const dot = file.name.lastIndexOf('.');
+    const stem = dot > 0 ? file.name.slice(0, dot) : file.name;
+    const extension = dot > 0 ? file.name.slice(dot) : '';
+    let name = file.name;
+    for (let suffix = 2; usedNames.has(name); suffix++) name = `${stem} (${suffix})${extension}`;
+    usedNames.add(name);
+    files.push(name === file.name ? file : new File([file], name, { type: file.type }));
+  }
+  return files;
+}
+
+function findComposer() {
+  const findVisible = (selector: string) => Array.from(document.querySelectorAll<HTMLElement>(selector))
+    .find(element => !element.closest('[hidden], [inert], [aria-hidden="true"], [role="dialog"]') &&
+      getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden');
+  const editor = findVisible('#prompt-textarea')
+    ?? findVisible('form .ProseMirror[contenteditable="true"], form textarea')
+    ?? findVisible('form [contenteditable="true"]');
+  if (!editor) return null;
+  const root = editor.closest('form') ?? editor.closest('[data-testid="composer"], #thread-bottom-container');
+  return { editor, root };
+}
+
+function findFileInput(root: Element | null, files: File[]): HTMLInputElement | undefined {
+  const knownInput = document.querySelector<HTMLInputElement>('input[type="file"]#upload-files');
+  const inputs = [
+    ...(knownInput ? [knownInput] : []),
+    ...Array.from(root?.querySelectorAll<HTMLInputElement>('input[type="file"]') ?? []),
+  ];
+  return inputs.find(input => {
+    if (input.disabled || input.hasAttribute('capture') || input.id === 'upload-photos') return false;
+    const accept = input.accept.toLowerCase().split(',').map(token => token.trim()).filter(Boolean);
+    if (!accept.length) return true;
+    return accept.some(token => !/^(image|video|audio)\//.test(token)) && files.every(file =>
+      accept.some(token => token.startsWith('.') ? file.name.toLowerCase().endsWith(token)
+        : token.endsWith('/*') ? file.type.startsWith(token.slice(0, -1))
+        : token === file.type)
+    );
+  });
+}
+
+const normalize = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+function readEditor(editor: HTMLElement): string {
+  return normalize(editor instanceof HTMLTextAreaElement ? editor.value : editor.innerText ?? editor.textContent ?? '');
+}
+
+function insertText(editor: HTMLElement, text: string): void {
+  editor.focus();
+  if (editor instanceof HTMLTextAreaElement) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(editor, text);
+  } else {
+    try {
+      if (document.execCommand('insertText', false, text) && readEditor(editor) === normalize(text)) return;
+    } catch { /* Fall back to updating the editor directly. */ }
+    const paragraph = document.createElement('p');
+    paragraph.textContent = text;
+    editor.replaceChildren(paragraph);
+  }
+  editor.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+}
+
+function attachmentNames(root: Element | null, editor: HTMLElement): Set<string> {
+  const names = new Set<string>();
+  for (const node of root?.querySelectorAll('span, div, a, [aria-label], [title], img[alt]') ?? []) {
+    if (node.contains(editor) || editor.contains(node) || node.closest('[hidden], [inert], [aria-hidden="true"]')) continue;
+    for (const label of ['title', 'aria-label', 'alt']) {
+      const name = node.getAttribute(label);
+      if (name) names.add(name.trim());
     }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: attached.type });
-    return new File([blob], attached.name, { type: attached.type });
+    if (!node.children.length && node.textContent) names.add(node.textContent.trim());
   }
-  // Plain text content
-  return new File([attached.content || ''], attached.name, { type: attached.type });
+  return names;
 }
 
-function findChatGPTEditor(): HTMLElement | null {
-  return (
-    (document.querySelector('#prompt-textarea') as HTMLElement | null) ||
-    (document.querySelector('form div[contenteditable="true"]') as HTMLElement | null) ||
-    (document.querySelector('div[contenteditable="true"]') as HTMLElement | null) ||
-    (document.querySelector('textarea') as HTMLElement | null)
-  );
-}
+type AttachmentMethod = 'input' | 'paste' | 'drop';
+const methods: AttachmentMethod[] = ['input', 'paste', 'drop'];
 
-function findChatGPTSendButton(): HTMLButtonElement | null {
-  return (
-    (document.querySelector('[data-testid="send-button"]') as HTMLButtonElement | null) ||
-    (document.querySelector('button[aria-label*="Send prompt"]') as HTMLButtonElement | null) ||
-    (document.querySelector('button[aria-label*="Send"]') as HTMLButtonElement | null) ||
-    (document.querySelector('button[class*="send"]') as HTMLButtonElement | null)
-  );
-}
-
-function findChatGPTFileInput(): HTMLInputElement | null {
-  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'))
-    .filter(i => !i.disabled);
-  const isImageOrCamera = (i: HTMLInputElement): boolean => {
-    const accept = (i.getAttribute('accept') || '').toLowerCase();
-    return i.hasAttribute('capture') || accept.includes('image') || accept.includes('video') || accept.includes('camera');
-  };
-  return (
-    inputs.find(i => !i.getAttribute('accept') && !i.hasAttribute('capture')) ||
-    inputs.find(i => !isImageOrCamera(i)) ||
-    inputs[0] ||
-    null
-  );
-}
-
-function buildMainFile(pending: PendingHandoff): File {
-  if (pending.mimeType === 'text/markdown') {
-    return new File([pending.fileContent], pending.fileName, { type: pending.mimeType });
+function attachFiles(method: AttachmentMethod, editor: HTMLElement, root: Element | null, files: File[]): boolean {
+  const input = method === 'input' ? findFileInput(root, files) : undefined;
+  if (method === 'input' && !input) return false;
+  const dataTransfer = new DataTransfer();
+  files.forEach(file => dataTransfer.items.add(file));
+  try {
+    if (input) {
+      input.files = dataTransfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    } else if (method === 'paste') {
+      editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dataTransfer }));
+    } else {
+      (root ?? editor).dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+    }
+    return true;
+  } catch {
+    return false;
   }
-  const base64Data = pending.fileContent.split(',')[1] || pending.fileContent;
-  const byteCharacters = atob(base64Data);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  const blob = new Blob([byteArray], { type: pending.mimeType });
-  return new File([blob], pending.fileName, { type: pending.mimeType });
 }
 
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+const uploadGraceMs = 4_000;
+const composerSettleMs = 1_200;
+const timeoutMs = 20_000;
 
 export const injectChatGPT = async (pending: PendingHandoff) => {
-  const mainFile = buildMainFile(pending);
+  const startPath = location.pathname;
+  const files = buildFiles(pending);
   const settings = await getStorage<Settings>('settings', {} as Settings);
-  const handoffText = pending.handoffText;
+  const expectedText = normalize(pending.handoffText);
+  const deadline = Date.now() + timeoutMs;
+  let currentEditor: HTMLElement | undefined;
+  let currentRoot: Element | null = null;
+  let nextMethod = 0;
+  let retryAt = 0;
+  let readySince: number | undefined;
 
-  const attachmentNames = [
-    mainFile.name,
-    ...(pending.attachments || []).map(a => a.name).filter(n => n !== 'debug_log.txt'),
-  ];
-
-  const dataTransfer = new DataTransfer();
-  dataTransfer.items.add(mainFile);
-  for (const att of pending.attachments || []) {
-    if (att.name === 'debug_log.txt') continue;
-    try {
-      dataTransfer.items.add(attachedFileToFile(att));
-    } catch { /* Skip attachments that cannot be converted. */ }
-  }
-
-  const textPresent = (): boolean => {
-    const editor = findChatGPTEditor();
-    return !!editor && !!editor.textContent && editor.textContent.includes(handoffText.substring(0, 10));
-  };
-
-  const chipsPresent = (): boolean => {
-    const leaves = document.querySelectorAll('span, div, a');
-    for (const el of Array.from(leaves)) {
-      if (el.children.length !== 0) continue;
-      if (el.closest('[contenteditable="true"], textarea')) continue;
-      const t = (el.textContent || '').trim();
-      if (t && attachmentNames.some(n => t === n || t.includes(n))) return true;
-    }
-    return false;
-  };
-
-  const insertText = (editor: HTMLElement): void => {
-    if (editor.textContent?.includes(handoffText.substring(0, 10))) return;
-    editor.focus();
-    let inserted = false;
-    try {
-      inserted = document.execCommand('insertText', false, handoffText);
-    } catch { /* Use the editor fallback below. */ }
-
-    if (!inserted || !editor.textContent?.includes(handoffText.substring(0, 10))) {
-      if (editor.tagName.toLowerCase() === 'textarea') {
-        const nativeSetter = Object.getOwnPropertyDescriptor(
-          window.HTMLTextAreaElement.prototype,
-          'value'
-        )?.set;
-        if (nativeSetter) {
-          nativeSetter.call(editor, handoffText);
-        } else {
-          (editor as HTMLTextAreaElement).value = handoffText;
-        }
-      } else {
-        editor.innerHTML = '';
-        const p = document.createElement('p');
-        p.textContent = handoffText;
-        editor.appendChild(p);
-      }
-      editor.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      editor.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    }
-  };
-
-  const attachViaInput = (): void => {
-    const fileInput = findChatGPTFileInput();
-    if (!fileInput) return;
-    try {
-      fileInput.files = dataTransfer.files;
-      fileInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    } catch { /* Try the paste/drop fallbacks below. */ }
-  };
-
-  const attachViaPaste = (editor: HTMLElement): void => {
-    try {
-      const pasteEvent = new ClipboardEvent('paste', {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dataTransfer,
-      });
-      editor.dispatchEvent(pasteEvent);
-    } catch { /* Some composers only accept a drop event. */ }
-  };
-
-  const attachViaDrop = (editor: HTMLElement): void => {
-    try {
-      const dropTarget = editor.closest('form') || editor;
-      const dropEvent = new DragEvent('drop', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer,
-      });
-      dropTarget.dispatchEvent(dropEvent);
-    } catch { /* The target UI may reject synthetic drop events. */ }
-  };
-
-  const maxAttempts = 30;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const editor = findChatGPTEditor();
-    if (editor) {
-      insertText(editor);
-
-      if (!chipsPresent()) {
-        attachViaInput();
-        await wait(400);
-      }
-      if (!chipsPresent()) {
-        attachViaPaste(editor);
-        await wait(400);
-      }
-      if (!chipsPresent()) {
-        attachViaDrop(editor);
-        await wait(400);
+  while (Date.now() < deadline && location.pathname === startPath) {
+    const composer = findComposer();
+    if (composer) {
+      const { editor, root } = composer;
+      const names = attachmentNames(root, editor);
+      if (!currentEditor && (readEditor(editor) || files.some(file => names.has(file.name)))) return;
+      const newComposer = editor !== currentEditor || root !== currentRoot;
+      if (newComposer) {
+        currentEditor = editor;
+        currentRoot = root;
+        nextMethod = 0;
+        retryAt = 0;
+        readySince = undefined;
       }
 
-      if (textPresent() && chipsPresent()) {
-        if (settings.autoSend) {
-          await wait(500);
-          const sendBtn = findChatGPTSendButton();
-          if (sendBtn && !sendBtn.disabled) {
-            sendBtn.click();
+      const text = readEditor(editor);
+      if (text && text !== expectedText) return; // A draft takes priority over the handoff.
+      if (!text && expectedText) {
+        if (readySince !== undefined) return; // The completed handoff was cleared or submitted.
+        insertText(editor, pending.handoffText);
+      }
+
+      const now = Date.now();
+      const missing = files.filter(file => !names.has(file.name));
+      if (missing.length === 0 && readEditor(editor) === expectedText) {
+        readySince ??= now;
+        if (now - readySince >= composerSettleMs) {
+          if (settings.autoSend !== true) return;
+          const send = root?.querySelector<HTMLButtonElement>(
+            'button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="Send"]'
+          );
+          if (send && !send.matches(':disabled, [aria-disabled="true"]') && !root?.querySelector('[aria-busy="true"]')) {
+            send.click();
+            return;
           }
         }
-        return;
+      } else {
+        readySince = undefined;
+        if (missing.length && now >= retryAt) {
+          while (nextMethod < methods.length) {
+            if (attachFiles(methods[nextMethod++], editor, root, missing)) {
+              retryAt = now + uploadGraceMs;
+              break;
+            }
+          }
+        }
       }
     }
-    await wait(1000);
+    await wait(200);
   }
-
-  console.warn('[MoveChat] ChatGPT injection could not be completed.');
+  console.warn('[MoveChat] ChatGPT handoff did not finish. Check the prompt and attachments before sending.');
 };

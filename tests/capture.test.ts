@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { captureTab, captureCurrentTab } from '../src/popup/capture';
+import { captureTab, captureCurrentTab } from '../src/background/capture';
 import type { Session } from '../src/shared/types';
 
 type Listener = (arg?: unknown) => void;
@@ -147,6 +147,7 @@ describe('captureCurrentTab transport', () => {
     delete (globalThis as unknown as { chrome?: unknown }).chrome;
   });
   afterEach(() => {
+    vi.useRealTimers();
     delete (globalThis as unknown as { chrome?: unknown }).chrome;
   });
 
@@ -200,6 +201,27 @@ describe('captureCurrentTab transport', () => {
     port.__emitMessage(resultMsg(OTHER_URL));
     await expect(promise).rejects.toThrow(/different page/i);
     expect(port.disconnect).toHaveBeenCalled();
+  });
+
+  it('reassembles a large capture from ordered chunks before validating it', async () => {
+    resetMocks(initialTab());
+    const port = makeFakePort();
+    state.portQueue.push(port);
+    const promise = captureTab(initialTab());
+    const payload = JSON.stringify(resultMsg());
+    const middle = Math.ceil(payload.length / 2);
+    port.__emitMessage({ type: 'result-chunk', index: 0, text: payload.slice(0, middle) });
+    port.__emitMessage({ type: 'result-chunk', index: 1, text: payload.slice(middle), final: true });
+    await expect(promise).resolves.toMatchObject({ sourceUrl: TARGET_URL, messages: baseSession().messages });
+  });
+
+  it('rejects an incomplete sequence of capture chunks', async () => {
+    resetMocks(initialTab());
+    const port = makeFakePort();
+    state.portQueue.push(port);
+    const promise = captureTab(initialTab());
+    port.__emitMessage({ type: 'result-chunk', index: 1, text: JSON.stringify(resultMsg()), final: true });
+    await expect(promise).rejects.toThrow('conversation transfer was incomplete');
   });
 
   it('rejects and does not save when the target tab navigated during the fetch', async () => {
@@ -357,10 +379,52 @@ describe('captureCurrentTab transport', () => {
     resetMocks(initialTab());
     const silentPort = makeFakePort();
     state.portQueue.push(silentPort);
-    const promise = captureTab(initialTab(), undefined, { timeoutMs: 25 });
+    const promise = captureTab(initialTab(), undefined, { idleTimeoutMs: 25 });
     await expect(promise).rejects.toThrow(/timed out/i);
     expect(silentPort.disconnect).toHaveBeenCalled();
     expect(injectCalls).toHaveLength(0);
+  });
+
+  it('captures past three minutes while the conversation keeps progressing', async () => {
+    vi.useFakeTimers();
+    resetMocks(initialTab());
+    const port = makeFakePort();
+    state.portQueue.push(port);
+    const onProgress = vi.fn();
+    const capture = captureTab(initialTab(), onProgress);
+    const messages: Session['messages'] = Array.from({ length: 400 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `Message ${i + 1}`,
+    }));
+
+    for (let current = 100; current <= messages.length; current += 100) {
+      await vi.advanceTimersByTimeAsync(60_000);
+      port.__emitMessage({ type: 'progress', current, total: messages.length, step: 'Processing messages...' });
+    }
+    port.__emitMessage(resultMsg(TARGET_URL, { session: { ...baseSession(), messageCount: messages.length, messages } }));
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(capture).resolves.toMatchObject({ sourceUrl: TARGET_URL, messageCount: messages.length, messages });
+    expect(onProgress).toHaveBeenCalledTimes(4);
+    expect(port.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it('times out if reported progress stops changing', async () => {
+    vi.useFakeTimers();
+    resetMocks(initialTab());
+    const port = makeFakePort();
+    state.portQueue.push(port);
+    const onProgress = vi.fn();
+    const capture = captureTab(initialTab(), onProgress);
+    const rejection = expect(capture).rejects.toThrow(/stopped making progress/i);
+    const progress = { type: 'progress', current: 1, total: 4, step: 'Processing messages...' };
+
+    port.__emitMessage(progress);
+    await vi.advanceTimersByTimeAsync(120_000);
+    port.__emitMessage(progress);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await rejection;
+    expect(onProgress).toHaveBeenCalledOnce();
+    expect(port.disconnect).toHaveBeenCalledOnce();
   });
 
   it('captureCurrentTab queries the active tab and reuses the pinned flow', async () => {

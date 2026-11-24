@@ -1,4 +1,4 @@
-# Local acceptance test — v1.2.1
+# Local acceptance test — v1.2.2
 
 Nothing in this checklist pushes code, merges a PR, publishes a release, or submits a store update.
 
@@ -21,6 +21,11 @@ npm run build:firefox:test
 Tests use development-only tooling and require a recent Node.js (24.15+ or 26+ recommended).
 
 ## Required manual checks
+
+- **Save after closing the popup.** On a chat with several images, start a save and click outside while **Saving...** is visible. Reopen MoveChat. It should show progress if the save is still running. After it finishes, the library should contain exactly one new entry.
+- **Save a long conversation.** Use a conversation that previously timed out if you have one. While progress advances, saving should continue past three minutes if needed. Open the saved conversation or export it and check the first and last messages.
+- **Capture ChatGPT from either end.** Save the same long ChatGPT chat from the top and from the bottom. Both saves should have the same messages and images. If an image is unavailable, the saved transcript should show the missing image count.
+- **Verify ChatGPT handoff.** Save a regular chat and a Temporary Chat with an image. Resume both in ChatGPT with Auto-send off and check the draft prompt, `movechat-history.md`, and image. Repeat with Auto-send on using a harmless chat and check that exactly one message is sent with the complete set of files.
 
 **Check conversation isolation first.** Use two harmless chats with different markers, for example `MOVECHAT_PYTHON_A` and `MOVECHAT_TEST_B`. Capture A, switch to B and capture it, then return to A and capture again **without refreshing between those switches**. Wait for each chat to finish loading before capture. Every saved entry must contain only that chat's messages and its **Captured page** URL must match the visible chat's address. Markdown/PDF exports now include that source URL too. If a chat changes during capture, an error with no newly saved entry is the expected safe outcome.
 

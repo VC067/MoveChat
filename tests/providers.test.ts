@@ -30,3 +30,36 @@ describe('shared converter compatibility', () => {
     expect(result.messages[1].content).toContain('```python\ndef test():\n    return 1\n```');
   });
 });
+
+it('captures DeepSeek turns from overlapping scroll positions while the tab is hidden', async () => {
+  vi.useFakeTimers();
+  const visibility = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  document.body.innerHTML = '<div class="ds-virtual-list"></div>';
+  const scroller = document.querySelector<HTMLElement>('.ds-virtual-list')!;
+  let top = 400;
+  Object.defineProperties(scroller, {
+    scrollHeight: { value: 600 },
+    clientHeight: { value: 200 },
+    scrollTop: { get: () => top, set: (value: number) => { top = Math.min(400, value); } },
+  });
+  const render = () => {
+    const first = Math.floor(top / 100);
+    const visible = first === 4 ? [4, 5] : [first];
+    scroller.innerHTML = visible.map(i =>
+      `<div data-virtual-list-item-key="${i}"><div class="ds-message">Turn ${i}</div></div>`
+    ).join('');
+  };
+  scroller.addEventListener('scroll', render);
+  render();
+  try {
+    const capture = scrapeDeepSeek();
+    await vi.runAllTimersAsync();
+    const result = await capture;
+    expect(result.messages.map(message => message.content)).toEqual(
+      Array.from({ length: 6 }, (_, i) => `Turn ${i}`)
+    );
+    expect(scroller.scrollTop).toBe(400);
+  } finally {
+    visibility.mockRestore();
+  }
+});

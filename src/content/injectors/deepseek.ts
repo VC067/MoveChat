@@ -64,7 +64,7 @@ export const injectDeepSeek = async (pending: PendingHandoff) => {
           if (att.name === 'debug_log.txt') continue;
           try {
             dataTransfer.items.add(attachedFileToFile(att));
-          } catch (_) {
+          } catch {
             // Skip files that can't be added
           }
         }

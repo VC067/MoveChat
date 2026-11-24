@@ -18,8 +18,8 @@ const isExtension = typeof chrome !== 'undefined' && chrome.storage !== undefine
 export const getStorage = <T>(key: string, defaultValue: T): Promise<T> => {
   return new Promise((resolve) => {
     if (isExtension) {
-      chrome.storage.local.get([key], (result: { [key: string]: any }) => {
-        resolve(result[key] !== undefined ? result[key] : defaultValue);
+      chrome.storage.local.get([key], (result: Record<string, unknown>) => {
+        resolve((result[key] !== undefined ? result[key] : defaultValue) as T);
       });
     } else {
       const val = localStorage.getItem(key);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MoveChat: Export & Transfer AI Chats (ChatGPT, Claude, Gemini & DeepSeek)",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Capture AI chat sessions and resume them in a new chat on any platform.",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
@@ -9,6 +9,7 @@
   "permissions": [
     "activeTab",
     "storage",
+    "unlimitedStorage",
     "tabs",
     "scripting"
   ],

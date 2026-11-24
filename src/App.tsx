@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useStorage } from './popup/hooks/useStorage';
 import { Header } from './popup/components/Header';
 import { LibraryView } from './popup/components/LibraryView';
@@ -9,7 +9,7 @@ import { DeleteConfirmation } from './popup/components/DeleteConfirmation';
 import { AllSessionsView } from './popup/components/AllSessionsView';
 import type { Session } from './shared/types';
 import { Loader2 } from 'lucide-react';
-import { captureCurrentTab } from './popup/capture';
+import { useCapture } from './popup/hooks/useCapture';
 
 type View = 'home' | 'provider' | 'detail' | 'settings' | 'all';
 
@@ -18,9 +18,9 @@ const App: React.FC = () => {
     sessions,
     settings,
     loading,
-    addSession,
     deleteSession,
     deleteSessions,
+    renameSession,
     updateSettings,
   } = useStorage();
 
@@ -29,62 +29,11 @@ const App: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [lastCapturedSession, setLastCapturedSession] = useState<Session | null>(null);
-  const [captureProgress, setCaptureProgress] = useState<{ current: number; total: number; step: string } | null>(null);
-  const captureInFlight = useRef<Promise<Session | null> | null>(null);
-
-  const handleCaptureCurrentTab = (): Promise<Session | null> => {
-    if (captureInFlight.current) return captureInFlight.current;
-    const runCapture = async (): Promise<Session | null> => {
-      setCaptureProgress({ current: 0, total: 1, step: 'Starting capture...' });
-      try {
-        if (typeof chrome !== 'undefined' && chrome.tabs) {
-          // The transport verifies the pinned tab, top frame and source URL
-          // before returning. Only this single path is allowed to save a result.
-          const newSession = await captureCurrentTab(setCaptureProgress);
-          await addSession(newSession);
-          setLastCapturedSession(newSession);
-          return newSession;
-        }
-        // DEV MODE FALLBACK
-        await new Promise<void>(resolve => setTimeout(resolve, 1000));
-          const platforms: Session['platform'][] = ['chatgpt', 'claude', 'gemini', 'perplexity', 'deepseek'];
-          const randPlatform = platforms[Math.floor(Math.random() * platforms.length)];
-          const mockSession: Session = {
-            id: `session_${Date.now()}`,
-            title: `AI Chat Capture Example (${randPlatform})`,
-            platform: randPlatform,
-            messageCount: 4,
-            imageCount: 0,
-            fileCount: 0,
-            startedAt: new Date(Date.now() - 3600000).toISOString(),
-            savedAt: new Date().toISOString(),
-            messages: [
-              { role: 'user', content: 'What is the speed of light?' },
-              {
-                role: 'assistant',
-                content:
-                  'The speed of light in a vacuum is approximately 299,792 kilometers per second (about 186,282 miles per second).',
-              },
-              { role: 'user', content: 'Can we go faster than that?' },
-              {
-                role: 'assistant',
-                content:
-                  "According to Einstein's theory of special relativity, physical objects cannot travel at or exceed the speed of light because it would require infinite energy.",
-              },
-            ],
-          };
-          await addSession(mockSession);
-          setLastCapturedSession(mockSession);
-          return mockSession;
-      } finally {
-        setCaptureProgress(null);
-      }
-    };
-    const request = runCapture().finally(() => { captureInFlight.current = null; });
-    captureInFlight.current = request;
-    return request;
-  };
+  const { capture, status } = useCapture();
+  const [dismissedCapture, setDismissedCapture] = useState<string>();
+  const lastCapturedSession = status.sessionId !== dismissedCapture
+    ? sessions.find(session => session.id === status.sessionId) ?? null
+    : null;
 
   const handleSelectSession = (session: Session) => {
     setSelectedSession(session);
@@ -97,21 +46,8 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTitle = async (id: string, newTitle: string) => {
-    const updatedSessions = sessions.map(s => (s.id === id ? { ...s, title: newTitle } : s));
-    const targetSession = updatedSessions.find(s => s.id === id);
-    if (targetSession) {
-      if (selectedSession && selectedSession.id === id) {
-        setSelectedSession({ ...selectedSession, title: newTitle });
-      }
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.set({ sessions: updatedSessions }, () => {
-          window.location.reload();
-        });
-      } else {
-        localStorage.setItem('sessions', JSON.stringify(updatedSessions));
-        window.location.reload();
-      }
-    }
+    await renameSession(id, newTitle);
+    setSelectedSession(session => session?.id === id ? { ...session, title: newTitle } : session);
   };
 
   const handleRequestDelete = (id: string) => {
@@ -134,7 +70,7 @@ const App: React.FC = () => {
   };
 
   const handleBack = useCallback(() => {
-    setLastCapturedSession(null);
+    setDismissedCapture(status.sessionId);
     switch (view) {
       case 'provider':
         setView('home');
@@ -157,7 +93,7 @@ const App: React.FC = () => {
       default:
         setView('home');
     }
-  }, [view, selectedProvider]);
+  }, [view, selectedProvider, status.sessionId]);
 
   if (loading || !settings) {
     return (
@@ -185,11 +121,12 @@ const App: React.FC = () => {
           <LibraryView
             sessions={sessions}
             lastCapturedSession={lastCapturedSession}
-            captureProgress={captureProgress}
+            captureProgress={status.progress ?? null}
+            captureError={status.error}
             onSelectSession={handleSelectSession}
             onSelectProvider={handleSelectProvider}
             onDeleteSessions={deleteSessions}
-            onCapture={handleCaptureCurrentTab}
+            onCapture={capture}
             onViewAll={() => setView('all')}
           />
         )}

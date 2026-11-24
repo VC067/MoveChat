@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Search, ChevronRight, CheckSquare, Square, Trash2, Download, X
 } from 'lucide-react';
@@ -23,6 +23,28 @@ const platformLabels: Record<string, string> = {
 };
 
 type DateFilter = 'all' | 'today' | 'week' | 'month' | 'year';
+
+const matchesDateFilter = (session: Session, dateFilter: DateFilter): boolean => {
+  if (dateFilter === 'all') return true;
+  const saved = new Date(session.savedAt);
+  const now = new Date();
+  if (dateFilter === 'today') {
+    return saved.toDateString() === now.toDateString();
+  }
+  if (dateFilter === 'week') {
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return saved >= weekAgo;
+  }
+  if (dateFilter === 'month') {
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return saved >= monthAgo;
+  }
+  if (dateFilter === 'year') {
+    const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    return saved >= yearAgo;
+  }
+  return true;
+};
 
 export const AllSessionsView: React.FC<AllSessionsViewProps> = ({
   sessions,
@@ -96,38 +118,14 @@ export const AllSessionsView: React.FC<AllSessionsViewProps> = ({
     }
   };
 
-  const matchesDateFilter = (session: Session): boolean => {
-    if (dateFilter === 'all') return true;
-    const saved = new Date(session.savedAt);
-    const now = new Date();
-    if (dateFilter === 'today') {
-      return saved.toDateString() === now.toDateString();
-    }
-    if (dateFilter === 'week') {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return saved >= weekAgo;
-    }
-    if (dateFilter === 'month') {
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      return saved >= monthAgo;
-    }
-    if (dateFilter === 'year') {
-      const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      return saved >= yearAgo;
-    }
-    return true;
-  };
-
-  const filteredSessions = useMemo(() => {
-    return sessions.filter(s => {
-      const matchesSearch = !searchQuery ||
-        s.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesPlatform = selectedPlatforms.length === 0 ||
-        selectedPlatforms.includes(s.platform);
-      const matchesDate = matchesDateFilter(s);
-      return matchesSearch && matchesPlatform && matchesDate;
-    });
-  }, [sessions, searchQuery, selectedPlatforms, dateFilter]);
+  const filteredSessions = sessions.filter(s => {
+    const matchesSearch = !searchQuery ||
+      s.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesPlatform = selectedPlatforms.length === 0 ||
+      selectedPlatforms.includes(s.platform);
+    const matchesDate = matchesDateFilter(s, dateFilter);
+    return matchesSearch && matchesPlatform && matchesDate;
+  });
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);

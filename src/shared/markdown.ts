@@ -16,6 +16,7 @@ export const generateMarkdown = (session: Session): string => {
   const platform = formatPlatformName(session.platform || 'unknown');
   md += `_Captured from ${platform} · ${session.messageCount} messages · ${session.imageCount} images · ${session.fileCount} files_\n`;
   if (session.sourceUrl) md += `Source: <${session.sourceUrl}>\n`;
+  if (session.missingImageCount) md += `Images unavailable at capture: ${session.missingImageCount}\n`;
   md += `_Verbatim · full conversation, nothing summarized_\n\n`;
   md += `---\n\n`;
 

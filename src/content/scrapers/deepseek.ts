@@ -1,4 +1,4 @@
-import type { Message, AttachedFile } from '../../shared/types';
+import type { Message, AttachedFile, Session } from '../../shared/types';
 import { elementToMarkdown } from '../dom';
 
 function waitForImageLoad(img: HTMLImageElement, timeoutMs = 5000): Promise<void> {
@@ -44,7 +44,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
           return dataUrl;
         }
       }
-    } catch (_) {
+    } catch {
       // Tainted canvas
     }
   }
@@ -63,7 +63,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
         reader.readAsDataURL(blob);
       });
     }
-  } catch (_) {
+  } catch {
     // Cross-origin blocked
   }
 
@@ -82,7 +82,7 @@ function waitForRender(ms: number): Promise<void> {
 
 export const scrapeDeepSeek = async (
   onProgress?: (current: number, total: number, step: string) => void
-): Promise<any> => {
+): Promise<Omit<Session, 'id' | 'platform'>> => {
   onProgress?.(0, 1, 'Finding scroll container...');
 
   const scrollContainer = document.querySelector('div.ds-virtual-list') as HTMLElement | null;
@@ -94,7 +94,7 @@ export const scrapeDeepSeek = async (
   let messageIndex = 0;
 
   const collectVisible = () => {
-    const items = document.querySelectorAll('div[data-virtual-list-item-key]');
+    const items = scrollContainer.querySelectorAll('div[data-virtual-list-item-key]');
     items.forEach(item => {
       const key = item.getAttribute('data-virtual-list-item-key');
       if (!key) return;
@@ -117,13 +117,22 @@ export const scrapeDeepSeek = async (
 
   const savedScrollTop = scrollContainer.scrollTop;
   const savedScrollBehavior = scrollContainer.style.scrollBehavior;
+  const scrollTo = (top: number) => {
+    scrollContainer.scrollTop = top;
+    // Background tabs can defer native scroll events along with rendering.
+    // Notify the virtual list so it can mount the rows for this position.
+    if (document.hidden) scrollContainer.dispatchEvent(new Event('scroll'));
+  };
 
   onProgress?.(0, 1, 'Scrolling to top...');
-  scrollContainer.scrollTop = 0;
+  scrollTo(0);
   await waitForRender(400);
   collectVisible();
 
   const viewportHeight = scrollContainer.clientHeight;
+  // Keep adjacent viewports overlapped. A virtual row can still be waiting
+  // to render at the edge of the current viewport, especially in a background tab.
+  const scrollDistance = Math.max(1, Math.floor(viewportHeight / 2));
 
   onProgress?.(0, 1, 'Scrolling through conversation...');
 
@@ -135,10 +144,10 @@ export const scrapeDeepSeek = async (
 
   while (scrollStep < MAX_STEPS) {
     scrollStep++;
-    scrollContainer.scrollTop += viewportHeight;
-    if (scrollContainer.scrollTop + viewportHeight >= scrollContainer.scrollHeight) {
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
-    }
+    scrollTo(Math.min(
+      scrollContainer.scrollTop + scrollDistance,
+      Math.max(0, scrollContainer.scrollHeight - viewportHeight)
+    ));
     await waitForRender(300);
     collectVisible();
 
@@ -151,7 +160,7 @@ export const scrapeDeepSeek = async (
     }
 
     const totalHeight = scrollContainer.scrollHeight;
-    const steps = Math.max(1, Math.ceil(totalHeight / Math.max(viewportHeight, 1)));
+    const steps = Math.max(1, Math.ceil((totalHeight - viewportHeight) / scrollDistance));
     onProgress?.(Math.min(scrollStep, steps), steps, `Found ${totalMessages} messages so far...`);
 
     const atBottom = scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 10;
@@ -159,12 +168,12 @@ export const scrapeDeepSeek = async (
   }
 
   for (let k = 0; k < 4; k++) {
-    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    scrollTo(scrollContainer.scrollHeight);
     await waitForRender(400);
     collectVisible();
   }
 
-  scrollContainer.scrollTop = savedScrollTop;
+  scrollTo(savedScrollTop);
   if (savedScrollBehavior) {
     scrollContainer.style.scrollBehavior = savedScrollBehavior;
   }
@@ -195,8 +204,8 @@ export const scrapeDeepSeek = async (
     const { element: msgEl } = sortedEntries[i][1];
     onProgress?.(i + 1, sortedEntries.length, `Processing message ${i + 1}/${sortedEntries.length}...`);
 
-    const isAssistant = msgEl.querySelector('.ds-assistant-message-main-content') !== null ||
-      msgEl.querySelector('.ds-markdown.ds-assistant-message-main-content') !== null;
+    const isAssistant = msgEl.matches('.ds-assistant-message-main-content') ||
+      msgEl.querySelector('.ds-assistant-message-main-content') !== null;
     const role: 'user' | 'assistant' = isAssistant ? 'assistant' : 'user';
 
     let thinking = '';

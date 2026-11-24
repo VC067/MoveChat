@@ -1,4 +1,4 @@
-import type { Message, AttachedFile } from '../../shared/types';
+import type { Message, AttachedFile, Session } from '../../shared/types';
 import { elementToMarkdown } from '../dom';
 
 // Wait for an image element to complete loading
@@ -63,7 +63,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
           return dataUrl;
         }
       }
-    } catch (_) {
+    } catch {
       // Tainted canvas — fall through
     }
   }
@@ -83,7 +83,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
         reader.readAsDataURL(blob);
       });
     }
-  } catch (_) {
+  } catch {
     // Cross-origin blocked / timeout — fall through
   }
 
@@ -101,11 +101,11 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
 
 export const scrapePerplexity = async (
   onProgress?: (current: number, total: number, step: string) => void
-): Promise<any> => {
+): Promise<Omit<Session, 'id' | 'platform'>> => {
   onProgress?.(0, 1, 'Finding Perplexity messages...');
   const messages: Message[] = [];
   let imageCount = 0;
-  let fileCount = 0;
+  const fileCount = 0;
 
   // Pre-load all images on the page before scraping
   const allPageImages = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
@@ -114,8 +114,8 @@ export const scrapePerplexity = async (
   // Try modern Perplexity DOM structure first:
   //   - User queries:     span.select-text (inside a query container)
   //   - Assistant answers: div[id^="markdown-content-"] > .prose
-  let userQuerySpans = document.querySelectorAll('span.select-text');
-  let answerContainers = document.querySelectorAll('div[id^="markdown-content-"]');
+  const userQuerySpans = document.querySelectorAll('span.select-text');
+  const answerContainers = document.querySelectorAll('div[id^="markdown-content-"]');
 
   if (userQuerySpans.length === 0 && answerContainers.length === 0) {
     // Fallback to older selectors
@@ -126,7 +126,9 @@ export const scrapePerplexity = async (
       throw new Error('No messages found. Are you in a Perplexity thread?');
     }
 
-    for (const block of Array.from(rawBlocks)) {
+    for (let i = 0; i < rawBlocks.length; i++) {
+      const block = rawBlocks[i];
+      onProgress?.(i + 1, rawBlocks.length, `Processing message ${i + 1}/${rawBlocks.length}...`);
       const text = elementToMarkdown(block);
       if (!text.trim()) continue;
 
@@ -193,6 +195,7 @@ export const scrapePerplexity = async (
     const pairCount = Math.max(userQuerySpans.length, answerContainers.length);
 
     for (let i = 0; i < pairCount; i++) {
+      onProgress?.(i + 1, pairCount, `Processing turn ${i + 1}/${pairCount}...`);
       // User message
       if (i < userQuerySpans.length) {
         const userEl = userQuerySpans[i];

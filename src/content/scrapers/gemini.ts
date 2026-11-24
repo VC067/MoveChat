@@ -1,4 +1,4 @@
-import type { Message, AttachedFile } from '../../shared/types';
+import type { Message, AttachedFile, Session } from '../../shared/types';
 import { elementToMarkdown } from '../dom';
 
 // Wait for an image element to complete loading
@@ -92,7 +92,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
           return dataUrl;
         }
       }
-    } catch (_) {
+    } catch {
       // Tainted canvas — fall through
     }
   }
@@ -112,7 +112,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
         reader.readAsDataURL(blob);
       });
     }
-  } catch (_) {
+  } catch {
     // Cross-origin blocked / timeout — fall through
   }
 
@@ -130,7 +130,7 @@ async function imageToBase64(img: HTMLImageElement): Promise<string> {
 
 export const scrapeGemini = async (
   onProgress?: (current: number, total: number, step: string) => void
-): Promise<any> => {
+): Promise<Omit<Session, 'id' | 'platform'>> => {
   onProgress?.(0, 1, 'Finding Gemini messages...');
 
   const querySelectors = [
@@ -263,7 +263,7 @@ export const scrapeGemini = async (
 
       if (src) {
         await waitForImageReady(img, 1500);
-        let base64 = await imageToBase64(img);
+        const base64 = await imageToBase64(img);
 
         if (base64 && base64.length > 100) {
           const isDup = files.some(f => f.content === base64);

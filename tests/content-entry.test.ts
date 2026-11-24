@@ -43,6 +43,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { location: pageUrl });
   vi.stubGlobal('chrome', {
     runtime: {
+      sendMessage: () => Promise.resolve(null),
       onConnect: { addListener: (listener: (port: chrome.runtime.Port) => void) => connectListeners.add(listener), removeListener: (listener: (port: chrome.runtime.Port) => void) => connectListeners.delete(listener) },
       onMessage: { addListener: (listener: unknown) => messageListeners.add(listener), removeListener: (listener: unknown) => messageListeners.delete(listener) },
     },
@@ -94,7 +95,7 @@ describe('content capture protocol', () => {
     expect(port.postMessage).toHaveBeenCalledOnce();
   });
 
-  it('does not post a late result to a disconnected popup', async () => {
+  it('does not post a late result to a disconnected capture receiver', async () => {
     let finish!: (value: typeof payload) => void;
     scrape.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     await import('../src/content/index');
